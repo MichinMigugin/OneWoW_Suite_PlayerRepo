@@ -1,6 +1,8 @@
 # OneWoW Suite — player install
 
-**Language:** English · [Deutsch](docs/install/deDE.md) · [Español (España)](docs/install/esES.md) · [Español (México)](docs/install/esMX.md) · [Français](docs/install/frFR.md) · [Italiano](docs/install/itIT.md) · [한국어](docs/install/koKR.md) · [Português (Brasil)](docs/install/ptBR.md) · [Русский](docs/install/ruRU.md) · [简体中文](docs/install/zhCN.md) · [繁體中文](docs/install/zhTW.md)
+**Language:** English · [Deutsch](deDE.md) · [Español (España)](esES.md) · [Español (México)](esMX.md) · [Français](frFR.md) · [Italiano](itIT.md) · [한국어](koKR.md) · [Português (Brasil)](ptBR.md) · [Русский](ruRU.md) · [简体中文](zhCN.md) · [繁體中文](zhTW.md)
+
+This page is the same English guide as the [repository README](../../README.md).
 
 This repository is the **player** copy of OneWoW: only the addon folders you put in World of Warcraft. It is kept up to date from the full [Suite repo](https://github.com/kellewic/OneWoW_Suite). You do not need that full repo to play.
 

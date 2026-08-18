@@ -1,3 +1,5 @@
+# Copies addon folders from kellewic/OneWoW_Suite only.
+# Does not touch README.md, docs/, or .github/.
 name: Sync from Suite
 
 on:
