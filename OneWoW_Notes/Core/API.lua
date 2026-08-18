@@ -1,0 +1,413 @@
+local _, ns = ...
+
+-- Public, cross-addon read surface for the Notes hub. ns stays private.
+OneWoW_Notes_API = {}
+
+--- Returns an NPC note.
+---@param npcID number
+---@return table|nil npcData
+function OneWoW_Notes_API.GetNPC(npcID)
+    return ns.NPCs:GetNPC(npcID)
+end
+
+--- Adds or updates an NPC note.
+---@param npcID number
+---@param npcData table
+---@return boolean saved
+function OneWoW_Notes_API.AddOrUpdateNPC(npcID, npcData)
+    npcID = tonumber(npcID)
+    if not npcID then
+        return false
+    end
+
+    local existing = ns.NPCs:GetNPC(npcID)
+    if existing then
+        for key, value in pairs(npcData) do
+            if value ~= nil then
+                existing[key] = value
+            end
+        end
+        ns.NPCs:SaveNPC(npcID, existing)
+    else
+        ns.NPCs:AddNPC(npcID, npcData)
+    end
+
+    return true
+end
+
+--- Adds a new NPC note (fails if the NPC already exists).
+---@param npcID number
+---@param npcData table
+---@return boolean saved
+function OneWoW_Notes_API.AddNPC(npcID, npcData)
+    npcID = tonumber(npcID)
+    if not npcID or not ns.NPCs then
+        return false
+    end
+    ns.NPCs:AddNPC(npcID, npcData)
+    return true
+end
+
+--- Saves an existing NPC note.
+---@param npcID number
+---@param npcData table
+---@return boolean saved
+function OneWoW_Notes_API.SaveNPC(npcID, npcData)
+    npcID = tonumber(npcID)
+    if not npcID or not ns.NPCs then
+        return false
+    end
+    ns.NPCs:SaveNPC(npcID, npcData)
+    return true
+end
+
+--- Opens an NPC note, selecting it when the NPCs tab is ready.
+---@param npcID number
+---@return boolean opened
+function OneWoW_Notes_API.OpenNPC(npcID)
+    npcID = tonumber(npcID)
+    if not npcID then
+        return false
+    end
+
+    ns.pendingNPCSelect = npcID
+    OneWoW.UI:Show("notes")
+    OneWoW.UI:SelectSubTab("notes", "npcs")
+
+    local tabFrame = OneWoW.UI:GetContentFrame("notes", "npcs")
+    if tabFrame and tabFrame.SelectNPC then
+        tabFrame.SelectNPC(npcID)
+        ns.pendingNPCSelect = nil
+    end
+
+    return true
+end
+
+--- Snapshot of a player unit for new note creation.
+---@param unit string?
+---@return table|nil playerInfo
+function OneWoW_Notes_API.GetPlayerInfoFromUnit(unit)
+    if not ns.Players then return nil end
+    return ns.Players:GetPlayerInfoFromUnit(unit or "target")
+end
+
+--- Returns a player note.
+---@param fullName string
+---@return table|nil playerData
+function OneWoW_Notes_API.GetPlayer(fullName)
+    if not fullName or fullName == "" or not ns.Players then
+        return nil
+    end
+    return ns.Players:GetPlayer(fullName)
+end
+
+--- Adds a new player note.
+---@param fullName string
+---@param playerData table
+---@return boolean saved
+function OneWoW_Notes_API.AddPlayer(fullName, playerData)
+    if not fullName or fullName == "" or not ns.Players then
+        return false
+    end
+    ns.Players:AddPlayer(fullName, playerData)
+    return true
+end
+
+--- Saves an existing player note.
+---@param fullName string
+---@param playerData table
+---@return boolean saved
+function OneWoW_Notes_API.SavePlayer(fullName, playerData)
+    if not fullName or fullName == "" or not ns.Players then
+        return false
+    end
+    ns.Players:SavePlayer(fullName, playerData)
+    return true
+end
+
+--- Records a collectible reference ("sighting") on a player note. Idempotent per
+--- key; the optional spellID is stored for context (dropped if it is a secret).
+---@param fullName string
+---@param key string canonical collectible key
+---@param spellID number|nil
+---@return boolean added
+function OneWoW_Notes_API.AddPlayerCollectibleRef(fullName, key, spellID)
+    if not fullName or fullName == "" or not ns.Players then
+        return false
+    end
+    return ns.Players:AddCollectibleRef(fullName, key, spellID)
+end
+
+--- True if a player note already references a collectible (structured ref, or a
+--- legacy content-embedded link). Lets callers dedup without knowing the note
+--- storage or link grammar.
+---@param fullName string
+---@param key string canonical collectible key
+---@return boolean
+function OneWoW_Notes_API.PlayerHasCollectibleRef(fullName, key)
+    if not fullName or fullName == "" or not ns.Players then
+        return false
+    end
+    return ns.Players:HasCollectibleRef(fullName, key)
+end
+
+--- Opens a player note, selecting it when the Players tab is ready.
+---@param fullName string
+---@return boolean opened
+function OneWoW_Notes_API.OpenPlayer(fullName)
+    if not fullName or fullName == "" then
+        return false
+    end
+
+    ns.pendingPlayerSelect = fullName
+    OneWoW.UI:Show("notes")
+    OneWoW.UI:SelectSubTab("notes", "players")
+
+    local tabFrame = OneWoW.UI:GetContentFrame("notes", "players")
+    if tabFrame and tabFrame.SelectPlayer then
+        tabFrame.SelectPlayer(fullName)
+        ns.pendingPlayerSelect = nil
+    end
+
+    return true
+end
+
+--- Refreshes the Players tab in place if it is already built, without opening
+--- the window. Reselects fullName when provided so external edits show live.
+---@param fullName string|nil
+---@return boolean refreshed
+function OneWoW_Notes_API.RefreshPlayersTab(fullName)
+    local tabFrame = OneWoW.UI:GetContentFrame("notes", "players")
+    if not tabFrame then
+        return false
+    end
+
+    if fullName and fullName ~= "" and tabFrame.SelectPlayer then
+        tabFrame.SelectPlayer(fullName)
+    elseif tabFrame.RefreshPlayersList then
+        tabFrame.RefreshPlayersList()
+    end
+
+    return true
+end
+
+--- Returns an item note.
+---@param itemID number
+---@return table|nil itemData
+function OneWoW_Notes_API.GetItem(itemID)
+    return ns.Items:GetItem(itemID)
+end
+
+--- Adds or updates an item note.
+---@param itemID number
+---@param itemData table
+---@return boolean saved
+function OneWoW_Notes_API.AddOrUpdateItem(itemID, itemData)
+    itemID = tonumber(itemID)
+    if not itemID then
+        return false
+    end
+
+    local existing = ns.Items:GetItem(itemID)
+    if existing then
+        for key, value in pairs(itemData) do
+            if value ~= nil then
+                existing[key] = value
+            end
+        end
+        ns.Items:SaveItem(itemID, existing)
+    else
+        ns.Items:AddItem(itemID, itemData)
+    end
+
+    return true
+end
+
+--- Returns the resolved current zone display title (zone + subzone when present).
+---@return string|nil
+function OneWoW_Notes_API.GetCurrentZoneName()
+    if not ns.Zones then return nil end
+    return ns.Zones:GetCurrentZoneName()
+end
+
+--- Returns live zone / subzone / map info for the player.
+---@return string zone
+---@return string subzone
+---@return table|nil mapInfo
+function OneWoW_Notes_API.GetCurrentZoneParts()
+    if not ns.Zones then return "", "", nil end
+    return ns.Zones:GetCurrentZoneParts()
+end
+
+--- Returns a zone note by opaque id.
+---@param noteId string
+---@return table|nil zoneData
+function OneWoW_Notes_API.GetZone(noteId)
+    if not noteId or noteId == "" or not ns.Zones then
+        return nil
+    end
+    return ns.Zones:GetZone(noteId)
+end
+
+--- Map context for the current player location.
+---@return table|nil mapInfo
+function OneWoW_Notes_API.GetCurrentMapInfo()
+    if not ns.Zones then return nil end
+    return ns.Zones:GetCurrentMapInfo()
+end
+
+--- Adds a new zone note. zoneData.zone is required. Returns the opaque note id.
+---@param zoneData table
+---@return string|nil noteId
+function OneWoW_Notes_API.AddZone(zoneData)
+    if type(zoneData) ~= "table" or not zoneData.zone or zoneData.zone == "" or not ns.Zones then
+        return nil
+    end
+    return ns.Zones:AddZone(zoneData)
+end
+
+--- Opens a zone note by opaque id (or by exact zone+subzone when given a legacy title string that FindIdByParts can resolve after migration).
+---@param noteIdOrTitle string
+---@return boolean opened
+function OneWoW_Notes_API.OpenZone(noteIdOrTitle)
+    if not noteIdOrTitle or noteIdOrTitle == "" or not ns.Zones then
+        return false
+    end
+
+    local noteId = noteIdOrTitle
+    if not ns.Zones:GetZone(noteId) then
+        local zone, subzone = ns.Zones:ParseLegacyKey(noteIdOrTitle)
+        noteId = ns.Zones:FindIdByParts(zone, subzone)
+        if not noteId then
+            return false
+        end
+    end
+
+    ns.pendingZoneSelect = noteId
+    OneWoW.UI:Show("notes")
+    OneWoW.UI:SelectSubTab("notes", "zones")
+
+    local tabFrame = OneWoW.UI:GetContentFrame("notes", "zones")
+    if tabFrame and tabFrame.SelectZone then
+        tabFrame.SelectZone(noteId)
+        ns.pendingZoneSelect = nil
+    end
+
+    return true
+end
+
+--- Opens an item note, selecting it when the Items tab is ready.
+---@param itemID number
+---@return boolean opened
+function OneWoW_Notes_API.OpenItem(itemID)
+    itemID = tonumber(itemID)
+    if not itemID then
+        return false
+    end
+
+    ns.pendingItemSelect = itemID
+    OneWoW.UI:Show("notes")
+    OneWoW.UI:SelectSubTab("notes", "items")
+
+    if ns.UI.OpenNotesItem and ns.UI.OpenNotesItem(itemID) then
+        ns.pendingItemSelect = nil
+    end
+
+    return true
+end
+
+-- ---------------------------------------------------------------------------
+-- Collectibles (keyed by canonical collectible key, e.g. "mount:2240")
+-- ---------------------------------------------------------------------------
+
+--- Returns a collectible record by key.
+---@param key string
+---@return table|nil record
+function OneWoW_Notes_API.GetCollectible(key)
+    if not ns.Collectibles then return nil end
+    return ns.Collectibles:GetCollectible(key)
+end
+
+--- Create-or-update a collectible record (only non-nil fields overwrite).
+---@param key string
+---@param fields table|nil
+---@return boolean ok, table|nil record
+function OneWoW_Notes_API.UpsertCollectible(key, fields)
+    if not ns.Collectibles then return false end
+    return ns.Collectibles:UpsertCollectible(key, fields)
+end
+
+--- Saves an existing collectible record.
+---@param key string
+---@param data table
+---@return boolean saved
+function OneWoW_Notes_API.SaveCollectible(key, data)
+    if not ns.Collectibles or not data then return false end
+    ns.Collectibles:SaveCollectible(key, data)
+    return true
+end
+
+--- Opens a collectible record, selecting it when the Collectibles tab is ready.
+---@param key string
+---@return boolean opened
+function OneWoW_Notes_API.OpenCollectible(key)
+    key = OneWoW.Collectibles.CanonicalizeKey(key)
+    if not key then
+        return false
+    end
+
+    ns.pendingCollectibleSelect = key
+    OneWoW.UI:Show("notes")
+    OneWoW.UI:SelectSubTab("notes", "collectibles")
+
+    local tabFrame = OneWoW.UI:GetContentFrame("notes", "collectibles")
+    if tabFrame and tabFrame.SelectCollectible then
+        tabFrame.SelectCollectible(key)
+        ns.pendingCollectibleSelect = nil
+    end
+
+    return true
+end
+
+--- Builds a canonical mount collectible key, or nil.
+---@param mountID number
+---@return string|nil key
+function OneWoW_Notes_API.BuildMountKey(mountID)
+    return OneWoW.Collectibles.BuildKey("mount", mountID)
+end
+
+--- Builds a canonical appearance-source collectible key, or nil.
+---@param sourceID number
+---@return string|nil key
+function OneWoW_Notes_API.BuildAppearanceSourceKey(sourceID)
+    return OneWoW.Collectibles.BuildKey("appearance", "source", sourceID)
+end
+
+--- Builds a clickable collectible hyperlink for a key (opens the Collectibles tab
+--- when clicked), or nil if the key is invalid. Lets other units embed a thin
+--- collectible reference in note content without knowing the link grammar.
+---@param key string
+---@return string|nil link
+function OneWoW_Notes_API.BuildCollectibleLink(key)
+    if not ns.NotesHyperlinks then return nil end
+    return ns.NotesHyperlinks:BuildCollectibleLink(key)
+end
+
+--- Show or toggle the Notes module in the suite hub.
+function OneWoW_Notes_API.OpenNotes()
+    if ns.SlashCommandHandler then
+        ns:SlashCommandHandler()
+    end
+end
+
+--- Hide the notes help panel when hub navigation changes.
+function OneWoW_Notes_API.CloseHelpPanel()
+    if ns.CloseHelpPanel then
+        ns:CloseHelpPanel()
+    end
+end
+
+--- Keybinding entry: opens Notes (no dedicated quick-note UI yet).
+function OneWoW_Notes_API.QuickNote()
+    OneWoW_Notes_API.OpenNotes()
+end

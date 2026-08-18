@@ -1,0 +1,484 @@
+local ADDON_NAME, ns = ...
+
+OneWoW.Locale:Register(ADDON_NAME, "enUS", {
+
+    ["CTX_OPEN_NOTES"] = "Open Notes",
+
+-- Addon
+    ["ADDON_LOADED"] = "Loaded!",
+    ["ADDON_TITLE_FRAME"] = "OneWoW Notes",
+
+-- Minimap
+    ["MINIMAP_TOOLTIP_TITLE"] = "OneWoW Notes",
+    ["MINIMAP_TOOLTIP_HINT"] = "Click to open",
+    ["MINIMAP_RIGHT_CLICK"] = "Right-click for options",
+    ["MINIMAP_OPEN"] = "Open OneWoW Notes",
+
+-- Tabs
+    ["TAB_NOTES"] = "Notes",
+    ["TAB_PLAYERS"] = "Players",
+    ["TAB_NPCS"] = "NPCs",
+    ["TAB_ZONES"] = "Zones",
+    ["TAB_ITEMS"] = "Items",
+    ["TAB_COLLECTIBLES"] = "Collectibles",
+
+-- Notes Tab
+    ["NOTES_LIST_TITLE"] = "Notes",
+    ["NOTES_DETAIL_TITLE"] = "Note",
+    ["NOTES_NEW"] = "New Note",
+    ["NOTES_TITLE_PLACEHOLDER"] = "Title...",
+    ["NOTES_BODY_PLACEHOLDER"] = "Write your note here...",
+    ["NOTES_EMPTY"] = "No notes yet. Click 'New Note' to add one.",
+    ["NOTES_SELECT"] = "Select a note to view.",
+    ["NOTES_DELETE_CONFIRM"] = "Delete this note?",
+    ["NOTES_UNTITLED"] = "Untitled Note",
+
+-- Players Tab
+    ["PLAYERS_LIST_TITLE"] = "Players",
+    ["PLAYERS_DETAIL_TITLE"] = "Player Note",
+    ["PLAYERS_NEW"] = "New Player Note",
+    ["PLAYERS_NAME_PLACEHOLDER"] = "Player name...",
+    ["PLAYERS_NOTE_PLACEHOLDER"] = "Write your note about this player...",
+    ["PLAYERS_EMPTY"] = "No player notes yet. Click 'New Player Note' to add one.",
+    ["PLAYERS_SELECT"] = "Select a player to view their note.",
+    ["PLAYERS_UNKNOWN"] = "Unknown Player",
+
+-- NPCs Tab
+    ["NPCS_LIST_TITLE"] = "NPCs",
+    ["NPCS_DETAIL_TITLE"] = "NPC Note",
+    ["NPCS_NEW"] = "New NPC Note",
+    ["NPCS_NAME_PLACEHOLDER"] = "NPC name...",
+    ["NPCS_NOTE_PLACEHOLDER"] = "Write your note about this NPC...",
+    ["NPCS_EMPTY"] = "No NPC notes yet. Click 'New NPC Note' to add one.",
+    ["NPCS_SELECT"] = "Select an NPC to view their note.",
+    ["NPCS_UNKNOWN"] = "Unknown NPC",
+
+-- Zones Tab
+    ["ZONES_LIST_TITLE"] = "Zones",
+    ["ZONES_DETAIL_TITLE"] = "Zone Note",
+    ["ZONES_NEW"] = "New Zone Note",
+    ["ZONES_NAME_PLACEHOLDER"] = "Zone name...",
+    ["ZONES_NOTE_PLACEHOLDER"] = "Write your note about this zone...",
+    ["ZONES_EMPTY"] = "No zone notes yet. Click 'New Zone Note' to add one.",
+    ["ZONES_SELECT"] = "Select a zone to view its note.",
+    ["ZONES_UNKNOWN"] = "Unknown Zone",
+
+-- Items Tab
+    ["ITEMS_DETAIL_TITLE"] = "Item Note",
+    ["ITEMS_NEW"] = "New Item Note",
+    ["ITEMS_NAME_PLACEHOLDER"] = "Item name or ID...",
+    ["ITEMS_NOTE_PLACEHOLDER"] = "Write your note about this item...",
+    ["ITEMS_EMPTY"] = "No item notes yet. Click 'New Item Note' to add one.",
+    ["ITEMS_SELECT"] = "Select an item to view its note.",
+    ["ITEMS_UNKNOWN"] = "Unknown Item",
+
+-- Settings Tab
+    ["SETTINGS_THEME"] = "Theme",
+    ["SETTINGS_THEME_DESC"] = "Choose a color theme. Changes apply instantly.",
+    ["SETTINGS_LANGUAGE_DESC"] = "Choose your preferred language. Changes apply instantly.",
+    ["SETTINGS_MINIMAP"] = "Minimap Button",
+
+-- Theme Names
+
+-- Language Names
+    ["LANG_ENUS"] = "English",
+    ["LANG_KOKR"] = "Korean",
+
+-- Context Menu
+    ["CTX_INSERT_TARGET"] = "Insert Target",
+    ["CTX_NO_TARGET"] = "No target selected.",
+    ["CTX_INSERT_DATETIME"] = "Insert Date/Time",
+    ["CTX_INSERT_SELF"] = "Insert My Name",
+    ["CTX_INSERT_HYPERLINK"] = "Insert Hyperlink",
+    ["CTX_INSERT_WAYPOINT"] = "Insert Waypoint",
+    ["CTX_ADD_CURRENT_LOCATION"] = "Add Current Location",
+    ["CTX_CANNOT_DETERMINE_LOCATION"] = "Cannot determine your location.",
+    ["CTX_CANNOT_GET_POSITION"] = "Cannot get map position.",
+    ["CTX_LOCATION_INSERTED"] = "Location inserted (Map: %d, X: %.1f, Y: %.1f)",
+    ["CTX_CANNOT_DETERMINE_ZONE"] = "Cannot determine current zone.",
+    ["CTX_COORDS_OUT_OF_RANGE"] = "Coordinates must be between 0 and 100.",
+
+-- Hyperlink Dialog
+    ["CTX_BUTTON_INSERT"] = "Insert",
+    ["CTX_LINK_TYPE_LABEL"] = "Link Type:",
+    ["CTX_ID_OR_VALUE"] = "ID or Value:",
+    ["CTX_LINK_TYPE_SPELL"] = "Spell",
+    ["CTX_LINK_TYPE_QUEST"] = "Quest",
+    ["CTX_HELP_ITEM"] = "Enter an item ID  (e.g. 19019)",
+    ["CTX_HELP_SPELL"] = "Enter a spell ID  (e.g. 1459)",
+    ["CTX_HELP_QUEST"] = "Enter a quest ID  (e.g. 1234)",
+    ["CTX_HELP_ACHIEVEMENT"] = "Enter an achievement ID  (e.g. 1234)",
+    ["CTX_HELP_CURRENCY"] = "Enter a currency ID  (e.g. 1234)",
+    ["CTX_HELP_TOY"] = "Enter a toy ID  (e.g. 1234)",
+    ["CTX_HELP_BATTLEPET"] = "Enter a battle pet species ID  (e.g. 1234)",
+    ["CTX_HELP_MOUNT"] = "Enter a mount ID  (e.g. 1234)",
+
+-- Waypoint Dialog
+    ["CTX_MAP_ID"] = "Map ID (0 = current map):",
+    ["CTX_MAP_HELP"] = "Enter 0 to use your current map.",
+    ["CTX_X_COORDINATE"] = "X Coordinate (0-100):",
+    ["CTX_Y_COORDINATE"] = "Y Coordinate (0-100):",
+    ["CTX_DESCRIPTION"] = "Label:",
+
+-- Notes controls and list
+    ["NOTES_LIST"] = "Notes List",
+    ["MESSAGE_SELECT_NOTE"] = "Select a note to edit",
+    -- "Untitled" (NOTE_UNTITLED / CORE_PIN_UNTITLED) intentionally NOT deduped —
+    -- adjective default-name whose form can vary by locale; leave scoped.
+    ["NOTE_UNTITLED"] = "Untitled",
+
+-- Notes sort
+    ["NOTE_SORT_BY"] = "Sort: %s",
+    ["NOTE_SORT_TITLE"] = "Title",
+    ["NOTE_SORT_CREATED"] = "Created",
+    ["NOTE_SORT_MODIFIED"] = "Modified",
+
+-- Notes UI labels
+    ["UI_CATEGORY_WITH_VALUE"] = "Category: %s",
+    ["UI_PROFESSIONS_WITH_VALUE"] = "Professions: %s",
+    ["UI_STORAGE_WITH_VALUE"] = "Storage: %s",
+    ["UI_STORAGE_ACCOUNT"] = "Account",
+    ["UI_COUNT_FORMAT"] = "%s: %d",
+    ["UI_TASKS"] = "Tasks:",
+    ["UI_MANAGE_CATEGORIES_DESC"] = "Add or remove custom categories",
+    ["UI_NOTES_HYPERLINK_HINT"] = "Click to show/hide help about using hyperlinks in notes",
+
+-- Note types
+    ["NOTE_TYPE_STANDARD"] = "Standard",
+    ["NOTE_TYPE_STANDARD_DESC"] = "Normal note with no automatic reset",
+    ["NOTE_TYPE_DAILY_DESC"] = "TODOs reset at daily server reset time",
+    ["NOTE_TYPE_WEEKLY_DESC"] = "TODOs reset at weekly server reset time",
+    ["NOTE_TYPE_LABEL_FORMAT"] = "%s Note",
+
+-- Note todo
+    ["NOTE_RESET_TODOS"] = "Reset All TODOs",
+    ["NOTE_RESET_TODOS_DESC"] = "Uncheck all completed tasks",
+
+-- Status bar
+
+-- Buttons
+    ["BUTTON_ADD_NOTE"] = "Add Note",
+
+-- Dialogs
+    ["DIALOG_ADD_NOTE_TITLE"] = "Add New Note",
+    ["DIALOG_NOTE_PROPERTIES_TITLE"] = "Note Properties: %s",
+    ["POPUP_DELETE_NOTE"] = "Delete note '%s'?",
+
+-- Success / Error
+    ["SUCCESS_NOTE_ADDED"] = "Note '%s' added successfully!",
+    ["ERROR_ENTER_NOTE_TITLE"] = "Please enter a note title",
+
+-- Tooltips for list item buttons
+    ["TOOLTIP_BUTTON_ADD_NOTE"] = "Add Note",
+    ["TOOLTIP_BUTTON_ADD_NOTE_DESC"] = "Create a new note",
+    ["TOOLTIP_NOTE_DELETE"] = "Delete Note",
+    ["TOOLTIP_NOTE_DELETE_DESC"] = "Remove this note",
+    ["TOOLTIP_NOTE_FAVORITE"] = "Favorite",
+    ["TOOLTIP_NOTE_FAVORITE_DESC"] = "Mark note as favorite",
+    ["TOOLTIP_NOTE_PIN"] = "Pin Note",
+    ["TOOLTIP_NOTE_PIN_DESC"] = "Pins Note to Screen",
+    ["TOOLTIP_NOTE_PROPERTIES"] = "Note Properties",
+    ["TOOLTIP_NOTE_PROPERTIES_DESC"] = "Edit note settings",
+
+-- Storage / Category labels
+    ["LABEL_ICON"] = "Icon",
+
+-- Label fields (for dialogs)
+    ["LABEL_NOTE_TITLE"] = "Note Title",
+    ["LABEL_STORAGE"] = "Storage",
+    ["LABEL_NOTE_COLOR"] = "Note Color",
+    ["LABEL_FONT_COLOR"] = "Font Color",
+    ["LABEL_NOTE_FONT"] = "Font",
+    ["LABEL_NOTE_TYPE"] = "Note Type",
+    ["LABEL_NOTE_CONTENT"] = "Note Content",
+
+-- Color names
+    ["COLOR_HUNTER_GREEN"] = "Hunter Green",
+    ["FONT_DEFAULT"] = "Default (Friz Quadrata)",
+    ["FONT_COLOR_MATCHING"] = "Default - Matching",
+    -- "Priest White" intentionally NOT deduped with NOTES_PIN_COLOR_PRIEST_WHITE —
+    -- two independent UIs (font-color picker vs pin-color set); keep separate.
+    ["FONT_COLOR_WHITE"] = "Priest White",
+    ["FONT_COLOR_BLACK"] = "Midnight Black",
+
+-- Pin color names
+    ["NOTES_PIN_COLOR_HUNTER_GREEN"] = "Hunter Green",
+    ["NOTES_PIN_COLOR_WARRIOR_TAN"] = "Warrior Tan",
+    ["NOTES_PIN_COLOR_PRIEST_WHITE"] = "Priest White",
+    ["NOTES_PIN_COLOR_WARLOCK_PURPLE"] = "Warlock Purple",
+    ["NOTES_PIN_COLOR_MAGE_BLUE"] = "Mage Blue",
+    ["NOTES_PIN_COLOR_ROGUE_YELLOW"] = "Rogue Yellow",
+    ["NOTES_PIN_COLOR_DRUID_ORANGE"] = "Druid Orange",
+    ["NOTES_PIN_COLOR_PALADIN_PINK"] = "Paladin Pink",
+    ["NOTES_PIN_COLOR_SHAMAN_BLUE"] = "Shaman Blue",
+    ["NOTES_PIN_COLOR_DEATHKNIGHT_RED"] = "Death Knight Red",
+    ["NOTES_PIN_COLOR_MONK_JADE"] = "Monk Jade",
+    ["NOTES_PIN_COLOR_DEMONHUNTER_PURPLE"] = "Demon Hunter Purple",
+    ["NOTES_PIN_COLOR_EVOKER_TEAL"] = "Evoker Teal",
+    ["NOTES_PIN_COLOR_DARKIRON"] = "Dark Iron",
+
+-- Category management
+    ["NOTES_CATEGORY_EMPTY"] = "Category name cannot be empty",
+    ["NOTES_CATEGORY_EXISTS"] = "Category already exists",
+    ["NOTES_CATEGORY_NOT_FOUND"] = "No custom categories found",
+    ["NOTES_CATEGORY_BUILTIN"] = "Cannot remove built-in category",
+    ["NOTES_CATEGORY_NOT_IN_CUSTOM"] = "Category not found in custom categories",
+
+-- Pinned window strings
+    ["CORE_PIN_NOTE_PREFIX"] = "Note:",
+    ["CORE_PIN_UNTITLED"] = "Untitled",
+    ["NOTE_PIN_HIDE_TASKS_UNTIL_HOVER"] = "Hide pinned tasks until hover",
+    ["NOTE_PIN_HIDE_TASKS_UNTIL_HOVER_DESC"] = "When pinned, show the task list only while the mouse is over the note.",
+    ["CORE_PIN_HOVER_TASKS"] = "Hover tasks",
+
+-- Items tab
+    ["ITEMS_LIST"] = "Items List",
+    ["TOOLTIP_BUTTON_ADD_ITEM_DESC"] = "Drag an item here to add a note for it.",
+    ["TOOLTIP_BUTTON_ADD_BY_ID"] = "Add by Item ID",
+    ["TOOLTIP_BUTTON_ADD_BY_ID_DESC"] = "Enter an item ID to create a note.",
+    ["MSG_ITEM_EXISTS"] = "Item already exists: %s",
+    ["MSG_ITEM_ADDED"] = "Added item: %s",
+    ["MSG_DRAG_ITEM"] = "Drag an item here to add it.",
+    ["NOTES_ITEM_INVALID_ID"] = "Invalid item ID.",
+    ["TOOLTIP_ITEM_DELETE"] = "Delete Item",
+    ["TOOLTIP_ITEM_DELETE_DESC"] = "Remove this item note",
+    ["TOOLTIP_ITEM_PROPERTIES_DESC"] = "Edit item settings",
+    ["TOOLTIP_ITEM_FAVORITE"] = "Favorite",
+    ["TOOLTIP_ITEM_FAVORITE_DESC"] = "Mark as favorite",
+    ["ITEM_ALERT_ON_LOOT"] = "Alert on Loot",
+    ["ITEM_ALERT_ON_LOOT_DESC"] = "Show an alert when this item is looted.",
+    ["POPUP_DELETE_ITEM"] = "Delete item note?",
+    ["DIALOG_ADD_ITEM_BY_ID"] = "Add Item by ID",
+    ["DIALOG_ITEM_PROPERTIES"] = "Item Properties",
+    ["ITEM_VALIDATE"] = "Validate",
+    ["ITEM_VALIDATE_FIRST"] = "Validate the item first.",
+    ["ITEM_LOADING"] = "Loading...",
+
+-- Collectibles tab
+    ["COLLECTIBLES_SELECT"] = "Select a collectible to view its details.",
+    ["COLLECTIBLE_INTENT_LABEL"] = "Intent",
+    ["COLLECTIBLE_INTENT_WANT"] = "Want",
+    ["COLLECTIBLE_INTENT_SPOTTED"] = "Spotted",
+    ["COLLECTIBLE_INTENT_FARMING"] = "Farming",
+    ["COLLECTIBLE_INTENT_DELETE"] = "Delete List",
+    ["COLLECTIBLE_DELETE_DESC"] = "Remove this collectible from your list",
+    ["COLLECTIBLE_SET_PROGRESS"] = "Set: %s (%d/%d)",
+    ["COLLECTIBLE_SET_MEMBERS"] = "Set appearances",
+    ["POPUP_DELETE_COLLECTIBLE"] = "Delete this collectible?",
+    ["COLLECTIBLE_SOLD_BY"] = "Sold by",
+    ["COLLECTIBLE_CANT_BUY"] = "Couldn't buy when last seen",
+    ["POPUP_CAPTURE_COLLECTIBLES"] = "Add %d vendor collectible(s) to your want list?",
+    ["COLLECTIBLE_CAPTURE_ADDED"] = "Added %d vendor collectible(s) to your want list.",
+    ["COLLECTIBLE_CAPTURE_PROMPT"] = "Prompt",
+    ["COLLECTIBLE_CAPTURE_AUTO"] = "Automatic",
+    ["COLLECTIBLE_TTL_IMMEDIATE"] = "Immediate",
+    ["COLLECTIBLE_EMPTY_DELETE_LIST"] = "Empty Delete List",
+    ["POPUP_EMPTY_DELETE_LIST"] = "Permanently delete all %d item(s) in the Delete List?",
+
+-- Zones tab
+    ["ZONES_LIST"] = "Zones List",
+    ["ZONES_CURRENT_SECTION"] = "Current Zone(s)",
+    ["BUTTON_ADD_CURRENT_ZONE"] = "Add Zone",
+    ["ZONE_ADD_PARENT"] = "Add Parent",
+    ["ZONE_ADD_PARENT_DESC"] = "Add a note for the parent/region zone.",
+    ["BUTTON_MANUAL_ENTRY"] = "Manual",
+    ["TOOLTIP_BUTTON_ADD_CURRENT_ZONE"] = "Add Current Zone",
+    ["TOOLTIP_BUTTON_ADD_CURRENT_ZONE_DESC"] = "Add a note for your current zone.",
+    ["TOOLTIP_BUTTON_MANUAL_ENTRY_ZONE_DESC"] = "Enter a zone name manually.",
+    ["MSG_NO_ZONE_DETECTED"] = "Cannot determine current zone.",
+    ["MSG_NO_PARENT_ZONE"] = "Cannot determine parent zone.",
+    ["MSG_ZONE_EXISTS"] = "Zone note already exists: %s",
+    ["MSG_ZONE_ADDED"] = "Added zone: %s",
+    ["TOOLTIP_ZONE_DELETE"] = "Delete Zone",
+    ["TOOLTIP_ZONE_DELETE_DESC"] = "Remove this zone note",
+    ["TOOLTIP_ZONE_PROPERTIES"] = "Zone Properties",
+    ["TOOLTIP_ZONE_PROPERTIES_DESC"] = "Edit zone settings",
+    ["TOOLTIP_ZONE_SOUND"] = "Zone Alert",
+    ["TOOLTIP_ZONE_SOUND_DESC"] = "Alert when entering this zone.",
+    ["TOOLTIP_ZONE_FAVORITE"] = "Favorite",
+    ["TOOLTIP_ZONE_FAVORITE_DESC"] = "Mark as favorite",
+    ["POPUP_DELETE_ZONE"] = "Delete zone note?",
+    ["DIALOG_ZONE_PROPERTIES"] = "Zone Properties",
+    ["LABEL_ZONE_NAME"] = "Zone Name:",
+    ["LABEL_SUBZONE"] = "Subzone:",
+    ["ZONE_ERROR_NAME_REQUIRED"] = "Zone name is required.",
+
+-- Notes dialog extras
+    ["NOTE_AUTOPIN_WHEN_COMPLETE"] = "Auto-hide when tasks complete",
+    ["LABEL_NOTE_PREVIEW"] = "Note Content Preview:",
+    ["UI_TOOLTIP_LINES"] = "Tooltip Lines:",
+
+-- Players tab
+    ["PLAYERS_LIST"] = "Players List",
+    ["BUTTON_ADD_TARGET"] = "Add Target",
+    ["TOOLTIP_BUTTON_ADD_TARGET_PLAYER_DESC"] = "Add a note for your current player target.",
+    ["TOOLTIP_BUTTON_MANUAL_ENTRY_PLAYER_DESC"] = "Enter a player name manually.",
+    ["MSG_TARGET_PLAYER_FIRST"] = "Target a player first.",
+    ["MSG_PLAYER_EXISTS"] = "Player note already exists.",
+    ["NOTES_PLAYER_ALERT_FOUND"] = "Targeted player with note: %s",
+    ["TOOLTIP_PLAYER_DELETE"] = "Delete Player",
+    ["TOOLTIP_PLAYER_DELETE_DESC"] = "Remove this player note",
+    ["TOOLTIP_PLAYER_PROPERTIES_DESC"] = "Edit player settings",
+    ["TOOLTIP_PLAYER_SOUND"] = "Alert on Sight",
+    ["TOOLTIP_PLAYER_SOUND_DESC"] = "Alert when you target this player.",
+    ["TOOLTIP_PLAYER_FAVORITE"] = "Favorite",
+    ["TOOLTIP_PLAYER_FAVORITE_DESC"] = "Mark as favorite",
+    ["POPUP_DELETE_PLAYER"] = "Delete player note?",
+    ["DIALOG_PLAYER_PROPERTIES"] = "Player Properties",
+    ["LABEL_NAME"] = "Player Name:",
+    ["LABEL_SERVER"] = "Realm:",
+    ["UI_GUILD_NONE"] = "<No Guild>",
+    ["PLAYER_MANUAL_ENTRY_TITLE"] = "Add Player",
+    ["PLAYER_LABEL_LEVEL"] = "Level:",
+    ["PLAYER_LABEL_CLASS"] = "Class:",
+    ["PLAYER_ERROR_NAME_REQUIRED"] = "Player name is required.",
+    ["PLAYER_ADD_ALTS"] = "Add Alts",
+    ["PLAYER_ADD_ALTS_DESC"] = "Add your alts from AltTracker data.",
+    ["PLAYER_ALTS_NO_DATA"] = "AltTracker data not found.",
+    ["PLAYER_ALTS_NONE_NEW"] = "No new alts found to add.",
+    ["PLAYER_ALTS_ADDED_COUNT"] = "Added %d alts.",
+    ["PLAYER_ADD_GUILD"] = "Add Guild",
+    ["PLAYER_ADD_GUILD_DESC"] = "Add guild members to player notes.",
+    ["PLAYER_ADD_GUILD_TITLE"] = "Add Guild Members",
+    ["PLAYER_GUILD_NOT_IN"] = "You are not in a guild.",
+    ["PLAYER_GUILD_NONE_NEW"] = "No new guild members to add.",
+    ["PLAYER_GUILD_ADDED_COUNT"] = "Added %d guild members.",
+    ["PLAYER_ADD_SELECTED"] = "Add Selected",
+
+-- NPCs tab
+    ["NPCS_LIST"] = "NPCs List",
+    ["TOOLTIP_BUTTON_ADD_TARGET_NPC_DESC"] = "Add a note for your current NPC target.",
+    ["TOOLTIP_BUTTON_MANUAL_ENTRY_NPC_DESC"] = "Enter an NPC ID manually.",
+    ["MSG_TARGET_NPC_FIRST"] = "Target an NPC first.",
+    ["MSG_NPC_NO_LOCATION"] = "No location recorded for this NPC.",
+    ["NOTES_NPC_ALERT_FOUND"] = "Targeted NPC with note: %s",
+    ["NOTES_NPC_ASSOC_QUESTS"] = "Associated Quests:",
+    ["NOTES_OPEN_QUESTS_IN_CATALOG"] = "Open in Catalog",
+    ["TOOLTIP_NPC_DELETE"] = "Delete NPC",
+    ["TOOLTIP_NPC_DELETE_DESC"] = "Remove this NPC note",
+    ["TOOLTIP_NPC_PROPERTIES_DESC"] = "Edit NPC settings",
+    ["TOOLTIP_NPC_SOUND"] = "Alert on Target",
+    ["TOOLTIP_NPC_SOUND_DESC"] = "Alert when you target this NPC.",
+    ["TOOLTIP_NPC_FAVORITE"] = "Favorite",
+    ["TOOLTIP_NPC_FAVORITE_DESC"] = "Mark as favorite",
+    ["POPUP_DELETE_NPC"] = "Delete NPC note?",
+    ["DIALOG_NPC_PROPERTIES"] = "NPC Properties",
+    ["LABEL_NPC_ID"] = "NPC ID:",
+    ["NPC_IGNORE_IF_DEAD"] = "Ignore if dead",
+    ["NPC_IGNORE_IF_DEAD_DESC"] = "Do not alert when this NPC is dead.",
+    ["UI_NPC_GOTO_TITLE"] = "Create Waypoint",
+    ["UI_NPC_CREATE_WAYPOINT"] = "Set a waypoint to this NPC's location.",
+    ["NPC_MANUAL_ENTRY_TITLE"] = "Add NPC",
+    ["NPC_LABEL_NAME"] = "NPC Name:",
+    ["NPC_LABEL_ZONE"] = "Zone:",
+    ["NPC_LABEL_LOCATION"] = "Location:",
+    ["NPC_ERROR_NAME_REQUIRED"] = "NPC name is required.",
+
+-- Settings - Detection
+    ["SETTINGS_DETECTION"] = "Detection & Alerts",
+    ["SETTINGS_ENABLED"] = "On",
+    ["SETTINGS_DISABLED"] = "Off",
+    ["SETTINGS_NPC_DETECTION"] = "NPC Detection",
+    ["SETTINGS_NPC_DETECTION_DESC"] = "Alert with a chat message and sound when you target an NPC that has a note with alerting enabled.",
+    ["SETTINGS_PLAYER_DETECTION"] = "Player Detection",
+    ["SETTINGS_PLAYER_DETECTION_DESC"] = "Alert with a chat message and sound when you target a player that has a note with alerting enabled.",
+    ["SETTINGS_ZONE_ALERTS"] = "Zone Alerts",
+    ["SETTINGS_ZONE_ALERTS_DESC"] = "Alert with a chat message and sound when you enter a zone that has a note with alerting enabled.",
+    ["SETTINGS_COLLECTIBLE_CAPTURE"] = "Vendor Collectible Capture",
+    ["SETTINGS_COLLECTIBLE_CAPTURE_DESC"] = "Add uncollected items you see at vendors to your want list. Prompt asks first; Automatic adds them silently.",
+    ["SETTINGS_AUTODELETE"] = "Auto-delete collected items",
+    ["SETTINGS_AUTODELETE_DESC"] = "When on, collected items you were tracking (Want, Spotted, Farming) move to the Delete List, then are permanently removed after the purge delay.",
+    ["SETTINGS_AUTODELETE_TTL"] = "Purge after",
+
+-- Zone pin button
+    ["TOOLTIP_ZONE_PIN"] = "Pin Zone Window",
+    ["TOOLTIP_ZONE_PIN_DESC"] = "Show a floating note window when you enter this zone.",
+
+-- Category Manager
+    ["CATMGR_TITLE"] = "Manage Categories",
+    ["CATMGR_ADDED"] = "Added category: %s",
+    ["CATMGR_REMOVED"] = "Removed category: %s",
+    ["CATMGR_ERROR"] = "An error occurred.",
+
+-- Hyperlink Help Panel
+    ["UI_HELP_PANEL_TITLE"] = "Hyperlink Help",
+    ["UI_HELP_TAB_LINKS"] = "Links",
+    ["UI_HELP_TAB_PINS"] = "Pins",
+    ["UI_HELP_LINKS_HINT"] = "Type a shorthand then close ) to auto-convert",
+    ["UI_HELP_FROM_GAME"] = "From Game",
+    ["UI_HELP_FROM_GAME_DESC"] = "Drag items or spells from your bags or spellbook directly into any note text box.",
+    ["UI_HELP_DETAIL_INSTRUCTION"] = "Type the shorthand and close ) to auto-convert:",
+    ["UI_HELP_DETAIL_EXAMPLE"] = "Example: %s",
+    ["UI_HELP_PASTE_BUTTON"] = "Paste",
+    ["UI_HELP_LINK_ITEM_SYNTAX"] = "(item=ID)",
+    ["UI_HELP_LINK_ITEM_EXAMPLE"] = "(item=19019)",
+    ["UI_HELP_LINK_SPELL_SYNTAX"] = "(spell=ID)",
+    ["UI_HELP_LINK_SPELL_EXAMPLE"] = "(spell=1459)",
+    ["UI_HELP_LINK_QUEST_NAME"] = "Quest",
+    ["UI_HELP_LINK_QUEST_SYNTAX"] = "(quest=ID)",
+    ["UI_HELP_LINK_QUEST_EXAMPLE"] = "(quest=1234)",
+    ["UI_HELP_LINK_ACHV_SYNTAX"] = "(ach=ID)",
+    ["UI_HELP_LINK_ACHV_EXAMPLE"] = "(ach=1234)",
+    ["UI_HELP_LINK_CURRENCY_SYNTAX"] = "(cur=ID)",
+    ["UI_HELP_LINK_CURRENCY_EXAMPLE"] = "(cur=1234)",
+    ["UI_HELP_LINK_TOY_SYNTAX"] = "(toy=ID)",
+    ["UI_HELP_LINK_TOY_EXAMPLE"] = "(toy=1234)",
+    ["UI_HELP_LINK_PET_SYNTAX"] = "(battlepet=ID)",
+    ["UI_HELP_LINK_PET_EXAMPLE"] = "(battlepet=1234)",
+    ["UI_HELP_LINK_MOUNT_SYNTAX"] = "(mount=ID)",
+    ["UI_HELP_LINK_MOUNT_EXAMPLE"] = "(mount=1234)",
+    ["UI_HELP_LINK_COLLECTIBLE_SYNTAX"] = "(collectible=KEY)",
+    ["UI_HELP_LINK_COLLECTIBLE_EXAMPLE"] = "(collectible=mount:1234)",
+    ["UI_HELP_LINK_WAYPOINT_NAME"] = "Waypoint",
+    ["UI_HELP_LINK_WAYPOINT_SYNTAX"] = "(/way X Y Label)",
+    ["UI_HELP_LINK_WAYPOINT_EXAMPLE"] = "(/way 52.3 41.7 Boss)",
+    ["UI_HELP_PIN_REGULAR_TITLE"] = "Regular Notes",
+    ["UI_HELP_PIN_REGULAR_LINE1"] = "Click the pin icon in the editor to pin a note to your screen.",
+    ["UI_HELP_PIN_REGULAR_LINE2"] = "Pinned notes can be moved, resized, and locked.",
+    ["UI_HELP_PIN_REGULAR_LINE3"] = "Right-click a pinned note for display options.",
+    ["UI_HELP_PIN_DAILY_TITLE"] = "Daily / Weekly Notes",
+    ["UI_HELP_PIN_DAILY_LINE1"] = "Set a note type to Daily or Weekly in its properties.",
+    ["UI_HELP_PIN_DAILY_LINE2"] = "Tasks reset automatically at the server reset time.",
+    ["UI_HELP_PIN_DAILY_LINE3"] = "Enable auto-hide to collapse the note when all tasks are done.",
+    ["UI_HELP_PIN_ZONE_TITLE"] = "Zone Notes",
+    ["UI_HELP_PIN_ZONE_LINE1"] = "Add a zone note and enable the zone pin to show it on entry.",
+    ["UI_HELP_PIN_ZONE_LINE2"] = "The note appears automatically when you enter that zone.",
+    ["UI_HELP_PIN_ZONE_LINE3"] = "Right-click the zone pin for display options.",
+
+    ["ADDON_TITLE_SHORT"] = "Notes",
+
+    ["BINDING_HEADER_ONEWOW_NOTES"] = "|cFF00FF00OneWoW|r Notes",
+    ["BINDING_NAME_ONEWOW_NOTES_QUICKNOTE"] = "Quick Note",
+
+    -- Keys referenced in code but previously missing from the locale
+    -- (surfaced by key-name-on-miss; values are the code-side fallbacks).
+    ["BUTTON_DESELECT_ALL"] = "Deselect All",
+    ["BUTTON_SELECT_ALL"] = "Select All",
+    ["DIALOG_CONFIRM_DELETE"] = "Confirm Delete",
+    ["LABEL_MAP_ID_OPTIONAL"] = "Map ID (optional):",
+    ["LABEL_PROFESSION_1"] = "Profession 1:",
+    ["LABEL_PROFESSION_2"] = "Profession 2:",
+    ["MSG_NPC_ID_EXISTS"] = "An NPC with that ID already exists.",
+    ["MSG_CANNOT_SET_WAYPOINT"] = "Could not set waypoint.",
+    ["NPC_ID_EDIT_TOOLTIP"] = "Change the NPC ID. Find correct IDs on WoWHead.",
+    ["NPC_ID_TOOLTIP"] = "Leave blank to auto-generate. Find IDs on WoWHead.",
+    ["NPC_LABEL_COORD_X"] = "Coord X:",
+    ["NPC_LABEL_COORD_Y"] = "Coord Y:",
+    ["NPC_LABEL_MAP_ID"] = "Map ID:",
+    ["NPC_SET_CURRENT"] = "Set Current",
+    ["NPC_SET_CURRENT_DESC"] = "Set location to your current position.",
+    ["PLAYER_ALTS_NOT_INSTALLED"] = "Requires OneWoW AltTracker to be installed.",
+    ["TOOLTIP_ZONE_ALERT"] = "Zone Alert",
+    ["TOOLTIP_ZONE_ALERT_DESC"] = "Toggle zone entry alert.",
+    ["UI_ZONES_HELP_HINT"] = "Click for zones help.",
+    ["UI_ZONES_HELP_TITLE"] = "Zones Help",
+    ["ZONES_SELECT_PROMPT"] = "Select a zone to view its content",
+    ["ZONE_CONFIRM_DELETE"] = "Delete zone: %s?",
+    ["ZONE_DETECT_FAIL"] = "Could not detect zone.",
+    ["ZONE_INVALID_MAP_ID"] = "Enter a valid number.",
+    ["ZONE_MAP_NOT_FOUND"] = "Map ID not found.",
+    ["ZONE_TODO_HEADER"] = "Checklist",
+    ["ZONE_VALIDATE_HINT"] = "Enter ID & click Validate",
+})
+
+ns.L = OneWoW.Locale:GetTable(ADDON_NAME)

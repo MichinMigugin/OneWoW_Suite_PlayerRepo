@@ -1,0 +1,12 @@
+<Bindings>
+    <Binding name="ONEWOW_CATALOG_OPEN" category="BINDING_HEADER_ONEWOW_CATALOG">
+        if OneWoW_Catalog_API then
+            OneWoW_Catalog_API.Toggle()
+        end
+    </Binding>
+    <Binding name="ONEWOW_CATALOG_ITEM_SEARCH" category="BINDING_HEADER_ONEWOW_CATALOG">
+        if OneWoW_Catalog_API then
+            OneWoW_Catalog_API.OpenItemSearch()
+        end
+    </Binding>
+</Bindings>

@@ -1,0 +1,3 @@
+local _, ns = ...
+local MapMiniToolsModule = ns.ModuleRegistry:Current()
+if not MapMiniToolsModule then return end

@@ -1,0 +1,37 @@
+local _, ns = ...
+local M = ns.ModuleRegistry:Current()
+
+OneWoW.Locale:Register(M._scope, "enUS", {
+
+    ["CHARINFO_TITLE"] = "Character Info Sheet",
+    ["CHARINFO_DESC"] = "Displays a clean info panel next to each equipped item on your character sheet showing item level (colored by quality), enchant status, gem status, and durability percentage.",
+    ["CHARINFO_ENCHANTED"] = "Enchanted",
+    ["CHARINFO_MISSING_ENCHANT"] = "Missing Enchant",
+    ["CHARINFO_NO_ENCHANT_NEEDED"] = "No Enchant Needed",
+    ["CHARINFO_ALL_SOCKETS_EMPTY"] = "All Sockets Empty",
+    ["CHARINFO_SOME_SOCKETS_EMPTY"] = "Some Sockets Empty",
+    ["CHARINFO_ALL_SOCKETS_FILLED"] = "All Sockets Filled",
+    ["CHARINFO_NO_SOCKETS"] = "No Sockets",
+    ["CHARINFO_TOGGLE_DURABILITY"] = "Show Durability",
+    ["CHARINFO_TOGGLE_DURABILITY_DESC"] = "Display durability percentage on item buttons",
+    ["CHARINFO_TOGGLE_SOCKETS"] = "Show No-Socket Icon",
+    ["CHARINFO_TOGGLE_SOCKETS_DESC"] = "Show an icon when items have no sockets",
+    ["CHARINFO_ENCHANT_SLOTS_HEADER"] = "Enchant Slot Tracking",
+    ["CHARINFO_ENCHANT_SLOTS_DESC"] = "Choose which equipment slots to track for enchants. Disabled slots will not show enchant status icons.",
+    ["CHARINFO_SLOT_HEAD"] = "Head",
+    ["CHARINFO_SLOT_NECK"] = "Neck",
+    ["CHARINFO_SLOT_SHOULDER"] = "Shoulder",
+    ["CHARINFO_SLOT_CHEST"] = "Chest",
+    ["CHARINFO_SLOT_WAIST"] = "Waist",
+    ["CHARINFO_SLOT_LEGS"] = "Legs",
+    ["CHARINFO_SLOT_FEET"] = "Feet",
+    ["CHARINFO_SLOT_WRIST"] = "Wrist",
+    ["CHARINFO_SLOT_HANDS"] = "Hands",
+    ["CHARINFO_SLOT_RING1"] = "Ring 1",
+    ["CHARINFO_SLOT_RING2"] = "Ring 2",
+    ["CHARINFO_SLOT_BACK"] = "Back",
+    ["CHARINFO_SLOT_MAINHAND"] = "Main Hand",
+    ["CHARINFO_SLOT_OFFHAND"] = "Off Hand",
+    ["FEATURES_ON"] = "On",
+    ["FEATURES_OFF"] = "Off",
+})

@@ -1,0 +1,17 @@
+<Bindings>
+    <Binding name="ONEWOW_DIRECTDEPOSIT_TOGGLE" category="BINDING_HEADER_ONEWOW_DIRECTDEPOSIT">
+        OneWoW_DirectDeposit_API.Toggle()
+    </Binding>
+    <Binding name="ONEWOW_DIRECTDEPOSIT_DEPOSIT" category="BINDING_HEADER_ONEWOW_DIRECTDEPOSIT">
+        OneWoW_DirectDeposit_API.ManualDeposit()
+    </Binding>
+    <Binding name="ONEWOW_DIRECTDEPOSIT_ADD_PERSONAL" category="BINDING_HEADER_ONEWOW_DIRECTDEPOSIT">
+        OneWoW_DirectDeposit_API.AddHoveredItemToList("personal")
+    </Binding>
+    <Binding name="ONEWOW_DIRECTDEPOSIT_ADD_WARBAND" category="BINDING_HEADER_ONEWOW_DIRECTDEPOSIT">
+        OneWoW_DirectDeposit_API.AddHoveredItemToList("warband")
+    </Binding>
+    <Binding name="ONEWOW_DIRECTDEPOSIT_ADD_GUILD" category="BINDING_HEADER_ONEWOW_DIRECTDEPOSIT">
+        OneWoW_DirectDeposit_API.AddHoveredItemToList("guild")
+    </Binding>
+</Bindings>

@@ -1,0 +1,50 @@
+## Interface: 120007, 120100
+## Version: R6.2608.1105
+## Title: OneWoW - Data: |cFFFFFFFFEndgame|r
+## Notes: OneWoW Data Addon that: tracks Mythic+, Raids, Great Vault, PVP, and endgame progression for all your characters.
+## Author: OneWoW Dev Team
+
+## RequiredDeps: OneWoW, OneWoW_AltTracker
+## LoadOnDemand: 1
+## Category: OneWoW
+## Group: OneWoW_AltTracker
+## IconTexture: Interface\AddOns\OneWoW\Media\neutral-mini.png
+
+## SavedVariables: OneWoW_AltTracker_Endgame_DB
+
+## X-Website: https://wow2.xyz/
+## X-Category: |cFFFFD100OneWoW|r
+## X-BugGrabber-Display: OneWow
+
+# Localization
+Locales\enUS.lua
+Locales\koKR.lua
+Locales\frFR.lua
+Locales\deDE.lua
+Locales\zhCN.lua
+Locales\esES.lua
+Locales\zhTW.lua
+Locales\esMX.lua
+Locales\ruRU.lua
+Locales\ptBR.lua
+Locales\itIT.lua
+
+# Core
+Core\Database.lua
+Core\API.lua
+Core\Core.lua
+
+# Data Collection Modules
+Modules\MythicPlus.lua
+Modules\Raids.lua
+Modules\GreatVault.lua
+Modules\PVP.lua
+Modules\WorldBoss.lua
+Modules\Currencies.lua
+Modules\WeeklyActivities.lua
+
+# Data Manager (orchestrates all modules)
+Modules\DataManager.lua
+
+# Main Addon File
+OneWoW_AltTracker_Endgame.lua

@@ -1,0 +1,3 @@
+local _, ns = ...
+local MapWorldToolsModule = ns.ModuleRegistry:Current()
+if not MapWorldToolsModule then return end

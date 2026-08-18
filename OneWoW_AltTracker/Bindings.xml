@@ -1,0 +1,12 @@
+<Bindings>
+    <Binding name="ONEWOW_ALTTRACKER_TOGGLE" category="BINDING_HEADER_ONEWOW_ALTTRACKER">
+        if OneWoW_AltTracker_API then
+            OneWoW_AltTracker_API.Toggle()
+        end
+    </Binding>
+    <Binding name="ONEWOW_ALTTRACKER_OPEN_SETUP" category="BINDING_HEADER_ONEWOW_ALTTRACKER">
+        if OneWoW_AltTracker_API then
+            OneWoW_AltTracker_API.OpenSetup()
+        end
+    </Binding>
+</Bindings>

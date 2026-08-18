@@ -1,0 +1,120 @@
+name: Sync from Suite
+
+on:
+  schedule:
+    - cron: "0 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: sync-from-suite
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout player repo
+        uses: actions/checkout@v4
+
+      - name: Checkout Suite addon folders
+        uses: actions/checkout@v4
+        with:
+          repository: kellewic/OneWoW_Suite
+          path: .suite-src
+          fetch-depth: 1
+          sparse-checkout-cone-mode: true
+          sparse-checkout: |
+            OneWoW
+            OneWoW_AltTracker
+            OneWoW_AltTracker_Accounting
+            OneWoW_AltTracker_Auctions
+            OneWoW_AltTracker_Character
+            OneWoW_AltTracker_Collections
+            OneWoW_AltTracker_Endgame
+            OneWoW_AltTracker_Professions
+            OneWoW_AltTracker_Storage
+            OneWoW_Bags
+            OneWoW_Catalog
+            OneWoW_CatalogData_Journal
+            OneWoW_CatalogData_Quests
+            OneWoW_CatalogData_Tradeskills
+            OneWoW_CatalogData_Vendors
+            OneWoW_DirectDeposit
+            OneWoW_Mail
+            OneWoW_Notes
+            OneWoW_QoL
+            OneWoW_ShoppingList
+            OneWoW_Trackers
+            OneWoW_Utility_DevTool
+
+      - name: Replace mirrored addon folders
+        run: |
+          set -euo pipefail
+          folders=(
+            OneWoW
+            OneWoW_AltTracker
+            OneWoW_AltTracker_Accounting
+            OneWoW_AltTracker_Auctions
+            OneWoW_AltTracker_Character
+            OneWoW_AltTracker_Collections
+            OneWoW_AltTracker_Endgame
+            OneWoW_AltTracker_Professions
+            OneWoW_AltTracker_Storage
+            OneWoW_Bags
+            OneWoW_Catalog
+            OneWoW_CatalogData_Journal
+            OneWoW_CatalogData_Quests
+            OneWoW_CatalogData_Tradeskills
+            OneWoW_CatalogData_Vendors
+            OneWoW_DirectDeposit
+            OneWoW_Mail
+            OneWoW_Notes
+            OneWoW_QoL
+            OneWoW_ShoppingList
+            OneWoW_Trackers
+            OneWoW_Utility_DevTool
+          )
+          for d in "${folders[@]}"; do
+            test -d ".suite-src/$d"
+            rm -rf "$d"
+            cp -a ".suite-src/$d" "$d"
+          done
+          rm -rf .suite-src
+
+      - name: Commit and push if addons changed
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- \
+            OneWoW \
+            OneWoW_AltTracker \
+            OneWoW_AltTracker_Accounting \
+            OneWoW_AltTracker_Auctions \
+            OneWoW_AltTracker_Character \
+            OneWoW_AltTracker_Collections \
+            OneWoW_AltTracker_Endgame \
+            OneWoW_AltTracker_Professions \
+            OneWoW_AltTracker_Storage \
+            OneWoW_Bags \
+            OneWoW_Catalog \
+            OneWoW_CatalogData_Journal \
+            OneWoW_CatalogData_Quests \
+            OneWoW_CatalogData_Tradeskills \
+            OneWoW_CatalogData_Vendors \
+            OneWoW_DirectDeposit \
+            OneWoW_Mail \
+            OneWoW_Notes \
+            OneWoW_QoL \
+            OneWoW_ShoppingList \
+            OneWoW_Trackers \
+            OneWoW_Utility_DevTool
+          if git diff --cached --quiet; then
+            echo "No addon changes"
+            exit 0
+          fi
+          git commit -m "Sync addon folders from kellewic/OneWoW_Suite"
+          git push

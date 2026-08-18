@@ -1,0 +1,201 @@
+## Interface: 120007, 120100
+## Version: R6.2608.1105
+## Title: |cFF00FF00OneWoW|r
+## Notes: OneWoW - Central Hub for all OneWoW addons
+## Author: OneWoW Dev Team
+
+## OptionalDeps: Auctionator, Pawn, TradeSkillMaster
+## Category: OneWoW
+## Group: OneWoW
+
+## SavedVariables: OneWoW_DB
+
+## AddonCompartmentFunc: 1WoW_OnAddonCompartmentClick
+## AddonCompartmentFuncOnEnter: 1WoW_OnAddonCompartmentEnter
+## AddonCompartmentFuncOnLeave: 1WoW_OnAddonCompartmentLeave
+## IconTexture: Interface\AddOns\OneWoW\Media\neutral-mini.png
+
+## X-Website: https://wow2.xyz/
+## X-Category: |cFFFFD100OneWoW|r
+## X-BugGrabber-Display: OneWow
+
+# Libraries (LibStub first; LibSharedMedia and LibDataBroker need it + CallbackHandler)
+Libs\LibStub\LibStub.lua
+Libs\CallbackHandler-1.0\CallbackHandler-1.0.lua
+Libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
+Libs\LibDBIcon-1.0\LibDBIcon-1.0.lua
+Libs\LibSharedMedia-3.0\LibSharedMedia-3.0.lua
+
+# Media
+Media\fonts.lua
+
+# GUI toolkit (absorbed OneWoW_GUI library — publishes the OneWoW_GUI global).
+# Widget files - DO NOT reorder. Dependencies: Controls needs Buttons+Display;
+# Layout needs Buttons+Controls; Panels needs Buttons+Layout+EditBoxes;
+# ItemListEditor needs Buttons+EditBoxes+Panels (CreateScrollFrame).
+GUI\Core.lua
+GUI\Database.lua
+GUI\Constants.lua
+GUI\OneWoW_GUI.lua
+GUI\Buttons.lua
+GUI\Display.lua
+GUI\Charts.lua
+GUI\Controls.lua
+GUI\EditBoxes.lua
+GUI\Layout.lua
+GUI\SideBarTabs.lua
+GUI\Panels.lua
+GUI\ItemListEditor.lua
+GUI\Virtualizer.lua
+GUI\Cards.lua
+GUI\Icons.lua
+GUI\ReorderDrag.lua
+GUI\KeywordHelp.lua
+GUI\Settings.lua
+GUI\Fonts.lua
+GUI\DatabaseManager.lua
+# Load last in this block, in this order. ReportDialog registers settings
+# callbacks at file scope (needs Settings.lua) and draws with CreateFS (needs
+# Fonts.lua); CatalogConfirm renders through it.
+GUI\ReportDialog.lua
+GUI\CatalogConfirm.lua
+
+# Locale service — must load before any Locales file and before any reader of
+# OneWoW.L. Lives in Services/ but loads here (ahead of the Services block) for
+# that reason. See Docs/ARCHITECTURE.md (§6 "Localization").
+Services\LocaleService.lua
+
+# Shared locale (suite-wide vocab: themes, languages, minimap labels, buttons).
+# Loaded before the OneWoW-scoped files; the view resolves scope -> shared.
+# es/fr/de/ru harvested from standalone addons (Phase 2+); missing keys fall back to enUS.
+Locales\Shared\enUS.lua
+Locales\Shared\koKR.lua
+Locales\Shared\frFR.lua
+Locales\Shared\deDE.lua
+Locales\Shared\zhCN.lua
+Locales\Shared\esES.lua
+Locales\Shared\zhTW.lua
+Locales\Shared\esMX.lua
+Locales\Shared\ruRU.lua
+Locales\Shared\ptBR.lua
+Locales\Shared\itIT.lua
+
+# OneWoW-scoped locale
+Locales\enUS.lua
+Locales\koKR.lua
+Locales\frFR.lua
+Locales\deDE.lua
+Locales\zhCN.lua
+Locales\esES.lua
+Locales\zhTW.lua
+Locales\esMX.lua
+Locales\ruRU.lua
+Locales\ptBR.lua
+Locales\itIT.lua
+
+# Core
+Core\Events.lua
+Core\Constants.lua
+Core\Format.lua
+Core\Restriction.lua
+Core\Util.lua
+Core\CopyPaste.lua
+Core\Database.lua
+Core\ModuleRegistry.lua
+Core\AddonLoader.lua
+Core\Lifecycle.lua
+Core\StoreBootstrap.lua
+Core\SettingsFeatureRegistry.lua
+Core\FeatureIcons.lua
+Core\FirstRunWizard.lua
+Core\FeatureHealth.lua
+Core\WhatsNewData.lua
+Core\WhatsNew.lua
+
+# Services (shared OneWoW.* engines/utilities consumed cross-unit — see ARCHITECTURE §6).
+# DO NOT reorder within this block: TooltipScanner before PredicateEngine (PE
+# captures ns.TooltipScanner at file scope); ItemLevel before PredicateEngine +
+# upgrade-detection (they capture ns.ItemLevel at file scope); PredicateEngine
+# data files (item-overrides / hearthstones / geartokens / season-bonus-lists) before PredicateEngine.lua;
+# PredicateEngine before upgrade-detection + disenchant + tooltip-engine (they
+# capture PE at file scope); Disenchant allowlist/blocklist before disenchant.lua;
+# ItemPrices + RecipeKnownUtil before the overlay engine that consumes them;
+# overlay-icons + upgrade-detection before the Overlays2 block; within Overlays2:
+# definitions -> renderer -> engine -> surfaces (each captures the previous at
+# file scope); engine before itemstatus.
+Services\TooltipScanner.lua
+Services\ItemLevel.lua
+Services\PredicateEngine\item-overrides.lua
+Services\PredicateEngine\hearthstones.lua
+Services\PredicateEngine\geartokens.lua
+Services\PredicateEngine\season-bonus-lists.lua
+Services\PredicateEngine.lua
+Services\SearchCatalog.lua
+Services\SearchExpand.lua
+Services\AHItemKeys.lua
+Services\ItemPrices.lua
+Services\ItemDataLoader.lua
+Services\ProfessionRecipe.lua
+Services\RecipeKnownUtil.lua
+Services\Collectibles.lua
+Services\GearProficiency.lua
+Services\CollectiblesPunchLists.lua
+Services\ChunkedJob.lua
+Services\UIParent.lua
+Services\Merchant.lua
+Services\Inventory\BagTypes.lua
+Services\Inventory\BankTypes.lua
+Services\Inventory.lua
+Services\GuildBankTransfer.lua
+Services\overlay-icons.lua
+Services\upgrade-detection.lua
+Services\Disenchant\allowlist.lua
+Services\Disenchant\blocklist.lua
+Services\disenchant.lua
+Services\AltScope.lua
+Services\Overlays2\definitions.lua
+Services\Overlays2\renderer.lua
+Services\Overlays2\engine.lua
+Services\Overlays2\surfaces.lua
+Services\itemstatus.lua
+Services\toast-engine.lua
+Services\tooltip-engine.lua
+
+# Integrations
+Integrations\ExternalTooltipSync.lua
+
+# Features
+Features\ContextMenus.lua
+
+# Integrations
+Integrations\ArkInventory.lua
+Integrations\Baganator.lua
+Integrations\BetterBags.lua
+Integrations\OneWoW_Bags.lua
+Integrations\ElvUI.lua
+
+# Hub UI Framework
+UI\Framework.lua
+
+# Search
+Search\SearchData.lua
+Search\SearchFrame.lua
+
+# Hub UI
+UI\navigation.lua
+UI\MainWindow.lua
+UI\Minimap.lua
+UI\t-home.lua
+UI\settings-shared-panel.lua
+UI\t-settings.lua
+UI\t-rolesandalts.lua
+UI\t-searchshortcuts.lua
+UI\t-profiles.lua
+UI\t-charprofiles.lua
+UI\t-managefeatures.lua
+
+# Facade (curated orchestrator global — must load after all ns.* attachments)
+Core\Facade.lua
+
+# Main
+OneWoW.lua

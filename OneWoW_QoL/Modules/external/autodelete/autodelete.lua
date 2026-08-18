@@ -1,0 +1,3 @@
+local _, ns = ...
+local AutoDeleteModule = ns.ModuleRegistry:Current()
+if not AutoDeleteModule then return end

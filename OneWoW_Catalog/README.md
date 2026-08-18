@@ -1,0 +1,162 @@
+# OneWoW - Catalog
+
+**A complete reference database for World of Warcraft content. Look up instances, encounters, vendors, professions, and crafting recipes.**
+
+---
+
+## Features
+
+### Journal Tab - Instances & Raids
+Browse all dungeons and raids from every expansion:
+- **All Expansions Covered** - Classic through Midnight
+- See all instances and encounters at a glance
+- Detailed encounter information (if data addon is installed)
+- Look up loot tables and boss mechanics
+- Search for specific raids or dungeons
+- Perfect for planning raid nights or preparing for content
+
+### Vendors Tab
+Find vendors and what they sell:
+- Browse all NPCs that sell items
+- Search for specific vendors
+- See what items each vendor has for sale
+- Find vendors by location or item
+- Check prices and currency requirements
+- Filter by vendor type (general merchants, specialty vendors, etc.)
+
+### Tradeskills Tab
+Complete profession and recipe database:
+- Browse recipes for all professions (Alchemy, Blacksmithing, Cooking, Enchanting, Engineering, Fishing, Herbalism, Housing Dyes, Inscription, Jewelcrafting, Leatherworking, Mining, Skinning, Tailoring)
+- Search for specific recipes or crafts
+- See what materials each recipe requires
+- Find recipes that use specific materials
+- Look up profession skill requirements
+- Perfect for planning crafting projects
+
+### Item Search Tab
+Universal search across all item data:
+- Search for any item in the game
+- See where items come from (vendor, quest, drop, craft)
+- Check which vendors sell specific items
+- Find recipes that produce items
+- Look up loot from dungeons and raids
+- Quick reference for item sources
+
+---
+
+## Data Addons (Optional but Recommended)
+
+The Catalog works with companion data addons to provide complete information:
+
+### Data: Journal (OneWoW_CatalogData_Journal)
+- Detailed instance and encounter information
+- Dungeon and raid layouts
+- Boss mechanics and loot tables
+- Expansion history
+- Complete expansion coverage (Classic through Midnight)
+
+### Data: Tradeskills (OneWoW_CatalogData_Tradeskills)
+- Complete recipe database
+- Material requirements
+- Crafting costs and yields
+- Profession progression guides
+- All 14 professions covered
+
+### Data: Vendors (OneWoW_CatalogData_Vendors)
+- Vendor locations and NPCs
+- Item prices and currencies accepted
+- Vendor specialties
+- Seasonal vendors
+
+### Data: Quests (OneWoW_CatalogData_Quests)
+- Static quest database with live scanner enrichment
+- Per-character completion tracking
+- All expansions from Classic through Midnight
+
+Each data pack is optional. Disable any `OneWoW_CatalogData_*` addon you do not use to reduce memory and load time — `OneWoW_Catalog` itself keeps running.
+
+---
+
+## Disabling Data Modules
+
+`OneWoW_Catalog` always loads when enabled. The four **CatalogData** addons are separate load units; turn one off in the WoW addon list (or via suite feature controls) and only that pack's data disappears. Other Catalog tabs and unrelated suite addons keep working.
+
+Per-pack READMEs have a short summary; this table is the canonical cross-module reference.
+
+| Disabled module | In Catalog | Elsewhere in the suite |
+| --- | --- | --- |
+| **Journal** (`OneWoW_CatalogData_Journal`) | Journal tab empty; Item Search drop filter and drop details; collection status on journal loot; navigate-to-instance from toasts | QoL Item Tracker — no instance/encounter lines on item tooltips; QoL — no collection grid on instance-entry toasts or ESC instance panel |
+| **Quests** (`OneWoW_CatalogData_Quests`) | Quests tab empty (including active-quest views); Item Search quest-reward filter and details; open-to-quest navigation | Notes — no associated-quest list on NPCs; Journal — no "View Quest" or quest completion on journal loot *(also needs Quests)*; AltTracker settings — quest completion not listed for character purge |
+| **Vendors** (`OneWoW_CatalogData_Vendors`) | Vendors tab empty; Item Search vendor filter and "sold by" details; open-to-vendor navigation | Core — no "Open Vendor Details" on NPC context menus; QoL Item Tracker — no vendor lines on item tooltips |
+| **Tradeskills** (`OneWoW_CatalogData_Tradeskills`) | Tradeskills tab empty; Item Search crafted filter and recipe details (including known-by alts) | ShoppingList — no craft detection, craft orders, recipe picker, or crafting-quality inventory rollup; QoL Professions Panel — no supplemental alt recipe data from tradeskill scans |
+
+**Still works with any subset:** Catalog shell, Settings, Item Search (owned items via AltTracker), and every Catalog tab whose data pack remains enabled. ShoppingList profession-window hooks that use Blizzard APIs directly are unaffected by disabling Tradeskills.
+
+**Cross-dependencies:** Journal quest-loot links and completion badges need **both** Journal and Quests. ShoppingList recipe features need **Tradeskills** only (Catalog hub UI is not required for craft detection).
+
+---
+
+## Customization
+
+### 14+ Theme Options
+Choose from Forest Green, Ocean Blue, Royal Purple, Crimson Red, Sunset Orange, Deep Teal, Golden Amber, Rose Pink, Slate Gray, Earth Brown, Midnight Black, and more.
+
+### Instant Theme Switching
+No UI reload required for theme changes. Switch themes on the fly.
+
+### Multi-Language Support
+Supports all 11 suite locales via **OneWoW** — see [LOCALES.md](../OneWoW/Docs/LOCALES.md).
+
+### Search & Filter
+- Universal search across all data
+- Filter by expansion
+- Filter by type (dungeon, raid, quest, vendor, etc.)
+- Alphabetical sorting
+
+---
+
+## Installation
+
+1. Extract the `OneWoW_Catalog` folder to your `World of Warcraft\_retail_\Interface\AddOns\` directory
+2. Extract the `OneWoW` folder (required dependency) to the same directory
+3. (Optional but recommended) Extract the `OneWoW_CatalogData_*` folders for complete data
+4. Restart World of Warcraft or type `/reload` in-game
+5. Type `/1wcat` to open the addon
+
+## Requirements
+
+- **OneWoW** - Core hub addon (required)
+- **OneWoW_CatalogData_Journal** - Recommended for instance and encounter data (optional)
+- **OneWoW_CatalogData_Tradeskills** - Recommended for recipe and profession data (optional)
+- **OneWoW_CatalogData_Vendors** - Recommended for vendor and item data (optional)
+- **OneWoW_CatalogData_Quests** - Recommended for quest database and completion data (optional)
+
+## Slash Commands
+
+- `/1wcat` - Open Catalog
+
+## Localization
+
+Supports all 11 suite locales — see [LOCALES.md](../OneWoW/Docs/LOCALES.md).
+
+## Contributing
+
+See [CONTRIBUTING.md](../CONTRIBUTING.md).
+
+## Support
+
+**Website:** https://wow2.xyz/
+
+**Report issues:** Through Discord community or our website
+
+## OneWoW Suite
+
+Part of the [OneWoW Suite](../README.md). See the suite README for the full addon catalog and install guide.
+
+---
+
+**Author:** MichinMuggin / Ricky
+
+**Website:** https://wow2.xyz/
+
+**All rights reserved.**

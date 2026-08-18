@@ -1,0 +1,254 @@
+local _, ns = ...
+
+ns.Transactions = {}
+local Transactions = ns.Transactions
+
+local recentClaims = {}
+
+function Transactions:RecordTransaction(txData)
+    if not OneWoW_AltTracker_Accounting_DB or not OneWoW_AltTracker_Accounting_DB.transactions then
+        return false
+    end
+
+    local charKey = ns:GetCharacterKey()
+    if not charKey then
+        return false
+    end
+
+    txData.character = txData.character or charKey
+    txData.timestamp = txData.timestamp or GetServerTime()
+    txData.id = ns:GetNextTransactionID()
+
+    table.insert(OneWoW_AltTracker_Accounting_DB.transactions, 1, txData)
+    ns:TrimTransactions()
+
+    if txData.category ~= "uncategorized" then
+        table.insert(recentClaims, {
+            amount = txData.amount,
+            time = GetTime(),
+        })
+    end
+
+    ns:InvalidateStatistics()
+
+    if ns.onNewTransaction then
+        ns.onNewTransaction()
+    end
+
+    return true
+end
+
+-- Claims are FIFO match-and-consume. Each categorized record adds one claim;
+-- each PLAYER_MONEY event consumes the first matching claim. CLAIM_LIFETIME
+-- only bounds how long a stuck claim lingers before cleanup -- it is NOT a
+-- match window, because the user-action -> PLAYER_MONEY gap is server-latency
+-- bound and can exceed any reasonable sub-window.
+local CLAIM_LIFETIME = 10
+
+-- Claim a gold delta without writing a ledger row (Accountant-style IGNORE, or
+-- a safety claim after a split invoice so GoldWatcher does not double-count).
+---@param amount number copper (absolute)
+---@return boolean claimed
+function Transactions:ClaimAmount(amount)
+    if not amount or amount <= 0 then
+        return false
+    end
+    table.insert(recentClaims, {
+        amount = amount,
+        time = GetTime(),
+    })
+    return true
+end
+
+local function pruneExpiredClaims()
+    local now = GetTime()
+    for i = #recentClaims, 1, -1 do
+        if (now - recentClaims[i].time) > CLAIM_LIFETIME then
+            table.remove(recentClaims, i)
+        end
+    end
+end
+
+-- True if a matching claim exists, without consuming it. Used by merchant-open
+-- income safety nets so they do not steal the claim GoldWatcher still needs.
+---@param amount number copper (absolute)
+---@return boolean
+function Transactions:HasClaimForAmount(amount)
+    if not amount or amount <= 0 then
+        return false
+    end
+    pruneExpiredClaims()
+
+    for _, claim in ipairs(recentClaims) do
+        if math.abs(claim.amount - amount) <= 1 then
+            return true
+        end
+    end
+
+    local remaining = amount
+    for _, claim in ipairs(recentClaims) do
+        if claim.amount <= remaining + 1 then
+            remaining = remaining - claim.amount
+            if remaining <= 1 then
+                return true
+            end
+        end
+    end
+
+    return false
+end
+
+function Transactions:IsAmountClaimed(amount)
+    pruneExpiredClaims()
+
+    for i, claim in ipairs(recentClaims) do
+        if math.abs(claim.amount - amount) <= 1 then
+            table.remove(recentClaims, i)
+            return true
+        end
+    end
+
+    local remaining = amount
+    local matched = {}
+    for i, claim in ipairs(recentClaims) do
+        if claim.amount <= remaining + 1 then
+            table.insert(matched, i)
+            remaining = remaining - claim.amount
+            if remaining <= 1 then break end
+        end
+    end
+
+    if remaining <= 1 and #matched > 0 then
+        for i = #matched, 1, -1 do
+            table.remove(recentClaims, matched[i])
+        end
+        return true
+    end
+
+    return false
+end
+
+function Transactions:RecordIncome(category, amount, source, item, itemName, quantity, notes)
+    return self:RecordTransaction({
+        type = "income",
+        category = category,
+        amount = amount,
+        source = source or "Unknown",
+        item = item,
+        itemName = itemName,
+        quantity = quantity,
+        notes = notes,
+    })
+end
+
+function Transactions:RecordExpense(category, amount, source, item, itemName, quantity, notes)
+    return self:RecordTransaction({
+        type = "expense",
+        category = category,
+        amount = amount,
+        source = source or "Unknown",
+        item = item,
+        itemName = itemName,
+        quantity = quantity,
+        notes = notes,
+    })
+end
+
+function Transactions:DeleteTransaction(txId)
+    if not OneWoW_AltTracker_Accounting_DB or not OneWoW_AltTracker_Accounting_DB.transactions then
+        return false
+    end
+    for i, tx in ipairs(OneWoW_AltTracker_Accounting_DB.transactions) do
+        if tx.id == txId then
+            table.remove(OneWoW_AltTracker_Accounting_DB.transactions, i)
+            ns:InvalidateStatistics()
+            if ns.onNewTransaction then
+                ns.onNewTransaction()
+            end
+            return true
+        end
+    end
+    return false
+end
+
+function Transactions:UpdateTransaction(txId, newData)
+    if not OneWoW_AltTracker_Accounting_DB or not OneWoW_AltTracker_Accounting_DB.transactions then
+        return false
+    end
+    for _, tx in ipairs(OneWoW_AltTracker_Accounting_DB.transactions) do
+        if tx.id == txId then
+            if tx.isRollup then
+                return false
+            end
+            if newData.amount ~= nil then tx.amount = newData.amount end
+            if newData.itemName ~= nil then tx.itemName = newData.itemName end
+            if newData.category ~= nil then tx.category = newData.category end
+            if newData.source ~= nil then tx.source = newData.source end
+            if newData.notes ~= nil then tx.notes = newData.notes end
+            if newData.quantity ~= nil then tx.quantity = newData.quantity end
+            ns:InvalidateStatistics()
+            if ns.onNewTransaction then
+                ns.onNewTransaction()
+            end
+            return true
+        end
+    end
+    return false
+end
+
+function Transactions:RecordTransfer(category, amount, source, item, itemName, quantity, notes)
+    return self:RecordTransaction({
+        type = "transfer",
+        category = category,
+        amount = amount,
+        source = source or "Unknown",
+        item = item,
+        itemName = itemName,
+        quantity = quantity,
+        notes = notes,
+    })
+end
+
+-- Wipe the whole ledger: transactions and cached statistics, then stamp a fresh
+-- reset boundary. Backs the Financials "Reset Data" action.
+function Transactions:ResetAll()
+    local db = OneWoW_AltTracker_Accounting_DB
+    if not db then return false end
+
+    db.transactions = {}
+    if db.statistics then
+        db.statistics.totalIncome = 0
+        db.statistics.totalExpense = 0
+        db.statistics.netProfit = 0
+        db.statistics.lastCalculated = 0
+    end
+    if db.settings then
+        db.settings.resetDate = GetServerTime()
+    end
+
+    if ns.onNewTransaction then
+        ns.onNewTransaction()
+    end
+    return true
+end
+
+-- Remove every ledger entry belonging to one character. Returns the count
+-- removed (drives the AltTracker "Manage Alts" purge report).
+function Transactions:PurgeCharacter(charKey)
+    local db = OneWoW_AltTracker_Accounting_DB
+    if not db or not db.transactions then return 0 end
+
+    local txs = db.transactions
+    local removed = 0
+    for i = #txs, 1, -1 do
+        if txs[i].character == charKey then
+            tremove(txs, i)
+            removed = removed + 1
+        end
+    end
+
+    if removed > 0 and ns.onNewTransaction then
+        ns.onNewTransaction()
+    end
+    return removed
+end
