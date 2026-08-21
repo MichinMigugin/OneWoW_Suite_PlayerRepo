@@ -12,9 +12,14 @@ extracts under OneWoW_Workspace `.wow_db2`.
    listed. Shown in a separate section (`encounterID = -4`). Never mixed into
    boss rows. Never unioned across expansions.
 
-ATT on-disk extras (`OneWoWExtras_*`, plus legacy `OneWoWItems_*`) stay
-expansion-scoped. A live overlay runs only if AllTheThings is already loaded
-(never `LoadAddOn` / `EnsureLoaded` ATT).
+ATT on-disk extras (`OneWoWExtras_*`) stay expansion-scoped. A live overlay runs
+only if AllTheThings is already loaded (never `LoadAddOn` / `EnsureLoaded` ATT).
+
+`OneWoWExtras_*` is generated, not hand-written — see "Generated from the legacy
+extract" below. The old `OneWoWItems_*` / `OneWoWInstances_*` / `OneWoWEncounters_*`
+tables **no longer ship**: 25.6 MB of Lua parsed at load, of which ~76% duplicated
+Generated data and ~half the entries were duplicate `[itemID]` keys Lua discarded
+anyway. Nothing may read those globals or add them back to the TOC.
 
 ## EJ-faithful listing
 
@@ -43,23 +48,49 @@ collection, or when Has uncollected filters the current list.
 `GetInstanceByMapID` hydrates only the preferred card for that map. It must not
 build loot for every dungeon and raid.
 
-List cards use Generated item/boss counts so they paint without hydrating. Taxonomy
-tags (`hasTMog`, and so on) fill in after that card hydrates.
+**Has uncollected** is the one filter that must hydrate many cards, so it runs as a
+`OneWoW.ChunkedJob` and publishes matches as it finds them. Hydrating ~217 cards
+synchronously froze the client — the same stall lazy hydrate exists to avoid, just
+reached through a filter instead of through login. Any future filter that needs
+collection state has to be chunked the same way.
+
+List cards paint without hydrating. Taxonomy tags (`hasTMog`, and so on) fill in
+after that card hydrates, but the **item count must not change on open**: a
+skeleton card's `totalItems` is `CountGeneratedLoot` (unique `JournalLoot` itemIDs)
+plus `CountExtrasLoot` (unique non-achievement `OneWoWExtras_*` itemIDs for that
+card key), which is exactly what `ApplyTotals` recomputes after hydrate. Those two
+sets never overlap because the extras files are pre-diffed against `JournalLoot`,
+and achievement rows are excluded on both sides. Synthetic World cards hold extras
+only, so their count comes from `CountExtrasLoot` alone — it is not `0`.
 
 Hydrate itself is Instant-only: `C_Item.GetItemInfoInstant` plus
 `GetItemNameByID` / `GetItemQualityByID`. It must not call `GetItemInfo` or
 `RequestLoadItemDataByID` for every loot row (that was the hitch on a large
 raid card). ToyBox / Mount / Pet journal probes run only for leftover
 Miscellaneous or Consumable rows on that card, not for armor and weapons.
-Visible detail rows that still lack a name load through the store item loader.
 
-Because hydrate is Instant-only, a loot row may carry the localized
-`JOURNAL_UNKNOWN_ITEM` placeholder. Every row therefore also carries
-`nameResolved` (boolean): false means "still the placeholder, go fetch it". The
-live EJ merge and the item loader set it true when they fill a real name.
-Consumers must branch on `nameResolved`, never compare against the placeholder
-string — that key lives in this store's locale scope, so another addon
-re-localizing it gets the key name back instead of the translation.
+Those probes are deliberately **per card, not per visible row**: `ApplyTotals` turns
+`item.special` into the card's `hasToys` / `hasMounts` / `hasPets` tags and feeds the
+collectible filters, so deferring them to row paint would leave card tags and
+filters wrong until the player scrolled every row.
+
+Because hydrate is Instant-only, an uncached item resolves neither its name nor its
+quality: the row gets the localized `JOURNAL_UNKNOWN_ITEM` placeholder and quality
+`1`. Both are display fallbacks, and both are corrected the same way — the **store
+item cache is the source of truth for "resolved"**. A visible detail row asks
+`GetCachedItem(itemID)`; a hit settles name, icon and quality in one pass, a miss
+goes through `LoadItemData` (this is the one place `RequestLoadItemDataByID` may
+run, and only for rows actually on screen). Never gate that fill on the name alone:
+name and quality are separate facts, and the live EJ merge fills names without
+touching quality.
+
+Rows also carry `nameResolved` (boolean), which answers exactly one question: does
+this row still need a name from live EJ? `mergeEJRowsIntoEncounter` reads it before
+overwriting, and `HasUnresolvedBossNames` uses it to decide whether the
+`EJ_LOOT_DATA_RECIEVED` retry is still worth running. Consumers must never compare
+against the placeholder string instead — that key lives in this store's locale
+scope, so another addon re-localizing it gets the key name back, not the
+translation.
 
 ## World
 
@@ -110,6 +141,69 @@ CSV schema / mermaid: OneWoW_Workspace `.wow_db2/docs/journal.md`.
 Extract build pin: OneWoW_Workspace `.wow_db2/README.md`.
 Agent skill: `onewow-db2` (when to use extracts vs FrameXML / ATT).
 
+## Generated from the ATT extract
+
+`OneWoW_Utility_Extractor` writes the `OneWoWItems_*` extract into OneWoW_Workspace
+`.journal_extract/`. It stays there as an **input**; it is not shipped.
+`bin/journal_extras.py` distils it into the only two pieces the addon needs:
+
+| Output | Global | Contents |
+| --- | --- | --- |
+| `Data/<Expansion>-extras.lua` | `OneWoWExtras_<Expansion>` | loot the Adventure Guide does not list |
+| `Data/JournalItemNames.lua` | `ns.JournalItemNames` | offline names for Adventure Guide loot |
+
+```bash
+# from OneWoW_Workspace
+python bin/journal_extras.py measure   # row counts, per-field weight, projected size
+python bin/journal_extras.py emit      # rewrite both outputs
+```
+
+Re-run `emit` after either input changes — a new `journal_db2_tools.py generate`
+(loot moved into or out of the Adventure Guide) or a refreshed legacy extract.
+
+### Extras rows
+
+One flat row per (item, location); the row **is** the `itemData`, so it carries the
+display and classification fields `BuildExtrasEncounter` / `DetermineItemSpecial`
+read (`name`, `icon`, `quality`, `classID`, `subclassID`, `itemType`, `itemSubType`,
+`isTransmog`, `isToy`, `toyID`, `mountID`, `speciesID`, `achievementID`,
+`questSources`) plus its location (`instanceID` or `world`, `encounterID`,
+`difficulties`, `source`, `npcID`). It deliberately omits `link`: the visible-row
+fill resolves a live link through the store item loader, and `link` was the single
+heaviest field in the legacy tables.
+
+Duplicate `[itemID]` keys are **merged**, not last-wins. The extractor now emits one
+key per item, but older extracts repeat the same item many times (57,790 entries for
+29,174 unique items) because ATT stores an item per bucket; Lua kept only the last
+and silently dropped the earlier `locations`. Merging on read recovers 230 extras
+rows the client never saw, and keeps old extracts usable.
+
+Current output: 8,474 rows / 1.9 MB, against 69,822 legacy locations / 25.4 MB —
+12.1% of locations are genuine extras; the rest duplicate the Adventure Guide.
+
+### Item names and drop locations (cross-addon)
+
+`ns.JournalItemNames` covers Adventure Guide itemIDs only (18,137 of 19,067; the
+rest have no name in the extract and fall back to the client's cache). Extras rows
+carry their own `name`, so `GetItemNameIndex` folds them in on first use and
+returns one map.
+
+Two API surfaces exist so no other addon reads Journal data tables directly:
+
+- `GetItemNameIndex()` — flat `itemID -> name`. Catalog Item Search text-matches
+  against this. It must stay **offline**: `C_Item.GetItemNameByID` returns nil for
+  any uncached item, so resolving names live would silently drop most loot from a
+  name search (and that call was itself a measured stall).
+- `GetItemDropLocations(itemID)` — `{ instanceID, instanceName, encounterName,
+  difficulties }` per place an item drops, deduped by instance+encounter. Backs
+  both Item Search's drop list and the QoL item-tracker tooltip. Instance names
+  come from Generated `JournalInstanceMeta`, encounter names from Generated
+  `JournalEncounters` — which is why the legacy instance/encounter files are gone.
+
+The reverse index behind `GetItemDropLocations` builds on first query only, so a
+player who never opens Item Search and never hovers an item with the tracker
+tooltip enabled never pays for it.
+
 ## Live EJ merge
 
 Live merge is **per card** (`MergeInstance`), never a login walk of every
@@ -121,3 +215,11 @@ for the difficulty scan. Cards with `instanceID == 0` and delves are skipped.
 `EJ_LOOT_DATA_RECIEVED` (Blizzard’s spelling) refreshes the open card only when
 `SetLiveMergeTarget` is set; it does not rebuild the world cache.
 Hover tooltips still resolve a scaled link via `GetScaledLootLink`.
+
+On a cold session the first merge can beat the server's loot data, so the event
+retries — but only while `HasUnresolvedBossNames` is true and at most
+`MAX_MERGE_RETRIES` (3) times. Both bounds matter: the check is scoped to rows
+inside real encounters (`encounterID > 0`) because those are the only names EJ can
+supply, and without the counter, ATT extras and General / Achievement / Quest rows —
+which EJ will never name — kept the retry permanently armed and re-merged the card
+every 0.25s for the rest of the session.

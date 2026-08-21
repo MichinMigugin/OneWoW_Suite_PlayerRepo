@@ -247,8 +247,10 @@ local function GetDataAddon()
     return OneWoW_CatalogData_Journal_API
 end
 
---- Fill name / icon / quality for a visible loot row. Hydrate stays Instant-only;
---- RequestLoadItemDataByID runs here, for this row, via the store item loader.
+--- Fill name / icon / quality for a visible loot row. Hydrate stays Instant-only,
+--- so a row can arrive with the placeholder name *and* the fallback quality (both
+--- come from the same uncached-item condition). The store item cache is the source
+--- of truth for "resolved"; RequestLoadItemDataByID runs here, for this row.
 ---@param item table
 ---@param row Frame
 ---@param nameFS FontString
@@ -260,19 +262,14 @@ local function FillVisibleItemRow(item, row, nameFS, iconTex, iconFrame, include
     if not addon or not item or not item.itemID then
         return
     end
-    -- nameResolved comes from the data store: the placeholder string lives in the
-    -- Journal store's locale scope, so Catalog cannot compare against it.
-    if item.nameResolved then
-        return
-    end
-    local token = {}
-    row._journalFillToken = token
-    local function paint(result)
-        if not result then
-            return
-        end
+
+    ---@param result table
+    ---@param paintWidgets boolean
+    local function apply(result, paintWidgets)
         if result.name then
             item.name = result.name
+            -- Keep the store's flag in step: the live EJ merge reads it to decide
+            -- whether a row still needs an EJ name.
             item.nameResolved = true
             if item.itemData then
                 item.itemData.name = result.name
@@ -290,35 +287,41 @@ local function FillVisibleItemRow(item, row, nameFS, iconTex, iconFrame, include
         if result.link and item.itemData then
             item.itemData.link = result.link
         end
-        local canPaint = row._journalFillToken == token and row:IsShown()
-        if not canPaint then
-            if result.name then
-                ScheduleNameFillRefresh()
-            end
+        if not paintWidgets then
             return
         end
-        if result.name then
-            local displayName = item.name
-            if includeGuideMark and item.fromLiveEJ then
-                displayName = displayName .. " |cff888888(" .. GUIDE .. ")|r"
-            end
-            nameFS:SetText(displayName)
+        local displayName = item.name
+        if includeGuideMark and item.fromLiveEJ then
+            displayName = displayName .. " |cff888888(" .. GUIDE .. ")|r"
         end
-        if result.icon then
-            iconTex:SetTexture(result.icon)
-        end
-        if result.quality ~= nil then
-            local qr, qg, qb = OneWoW_GUI:GetItemQualityColor(result.quality)
-            iconFrame:SetBackdropBorderColor(qr, qg, qb)
-            nameFS:SetTextColor(qr, qg, qb)
-        end
+        nameFS:SetText(displayName)
+        iconTex:SetTexture(item.icon)
+        local qr, qg, qb = OneWoW_GUI:GetItemQualityColor(item.quality)
+        iconFrame:SetBackdropBorderColor(qr, qg, qb)
+        nameFS:SetTextColor(qr, qg, qb)
     end
-    local cached = addon.LoadItemData(item.itemID, function(_, result)
-        paint(result)
-    end)
+
+    -- Store cache entries are complete by construction (the loader refuses to
+    -- persist partials), so a hit settles name, icon and quality in one pass with
+    -- no timer and no item request.
+    local cached = addon.GetCachedItem(item.itemID)
     if cached then
-        paint(cached)
+        apply(cached, true)
+        return
     end
+
+    local token = {}
+    row._journalFillToken = token
+    addon.LoadItemData(item.itemID, function(_, result)
+        if not result then
+            return
+        end
+        local canPaint = row._journalFillToken == token and row:IsShown()
+        apply(result, canPaint)
+        if not canPaint and result.name then
+            ScheduleNameFillRefresh()
+        end
+    end)
 end
 
 -- Tooltips use the difficulty-scaled Encounter Journal link (captured per
@@ -735,11 +738,9 @@ local function BindInstanceListRow(row, _, instData, state)
     local countParts = {}
     if instData.instanceType == "delve" then
         -- Delves have no EJ loot table.
-    elseif encCount == 0 and #(instData.encounters or {}) == 0
-            and (not GetDataAddon() or not GetDataAddon().IsLiveMergeComplete
-            or not GetDataAddon().IsLiveMergeComplete()) then
-        tinsert(countParts, L["JOURNAL_LOADING_LOOT"])
     else
+        -- Skeleton cards already carry the hydrated totals (Generated loot plus
+        -- static extras), so there is never a "still loading" count to show.
         tinsert(countParts, FormatBossCount(encCount))
         tinsert(countParts, string.format(L["JOURNAL_CARD_ITEMS"], instData.totalItems or 0))
     end
@@ -1444,14 +1445,15 @@ RefreshDetailView = function(isSecondRefresh)
 
     if #(instData.encounters or {}) == 0 then
         if instData.instanceType ~= "delve" then
-            local loadingLine = OneWoW_GUI:CreateFS(parent, 12)
-            loadingLine:SetPoint("TOPLEFT", parent, "TOPLEFT", 10, yOffset)
-            loadingLine:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -10, yOffset)
-            loadingLine:SetJustifyH("LEFT")
-            local mergeDone = addon and addon.IsLiveMergeComplete()
-            loadingLine:SetText(mergeDone and L["JOURNAL_EMPTY"] or L["JOURNAL_LOADING_LOOT"])
-            loadingLine:SetTextColor(OneWoW_GUI:GetThemeColor("TEXT_MUTED"))
-            table.insert(detailElements, loadingLine)
+            -- The card is hydrated by the time the detail pane builds, so an
+            -- empty encounter list means empty, not pending.
+            local emptyLine = OneWoW_GUI:CreateFS(parent, 12)
+            emptyLine:SetPoint("TOPLEFT", parent, "TOPLEFT", 10, yOffset)
+            emptyLine:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -10, yOffset)
+            emptyLine:SetJustifyH("LEFT")
+            emptyLine:SetText(L["JOURNAL_EMPTY"])
+            emptyLine:SetTextColor(OneWoW_GUI:GetThemeColor("TEXT_MUTED"))
+            table.insert(detailElements, emptyLine)
             yOffset = yOffset - 24
         end
         parent:SetHeight(math.abs(yOffset) + 20)
@@ -1787,6 +1789,21 @@ local function ShowInstanceDetail(panels, instData)
     RefreshDetailView(false)
 end
 
+-- "Has uncollected" has to hydrate a card's loot before it can test collection
+-- state, and with the expansion filter on "All" that is every card in the index.
+-- Run it time-budgeted so the client stays responsive, and let the list fill as
+-- matches arrive rather than blocking on the whole walk.
+local journalUncollectedJob = nil
+local FinishJournalList
+local StartUncollectedFilter
+
+local function CancelUncollectedFilter()
+    if journalUncollectedJob then
+        journalUncollectedJob:Cancel()
+        journalUncollectedJob = nil
+    end
+end
+
 local function InstanceHasUncollected(inst, addon)
     if not addon or not inst or not inst.encounters then
         return false
@@ -1804,7 +1821,52 @@ local function InstanceHasUncollected(inst, addon)
     return false
 end
 
+---@param panels table
+---@param candidates table cards to test, in display order
+StartUncollectedFilter = function(panels, candidates)
+    local addon = GetDataAddon()
+    local matches = {}
+
+    if panels.emptyList then
+        panels.emptyList:Hide()
+    end
+
+    journalUncollectedJob = OneWoW.ChunkedJob.Start({
+        run = function(shouldYield)
+            for i = 1, #candidates do
+                local inst = candidates[i]
+                addon.EnsureEncounters(inst)
+                if InstanceHasUncollected(inst, addon) then
+                    matches[#matches + 1] = inst
+                end
+                -- Yield between cards only: one card's hydrate is indivisible.
+                OneWoW.ChunkedJob.YieldIfNeeded(shouldYield)
+            end
+        end,
+        onProgress = function()
+            wipe(listResults)
+            for i = 1, #matches do
+                listResults[i] = matches[i]
+            end
+            if journalListAPI then
+                journalListAPI.Refresh()
+            end
+            if panels.leftStatusText then
+                panels.leftStatusText:SetText(string.format(L["JOURNAL_STATS"], #matches))
+            end
+        end,
+        onComplete = function()
+            journalUncollectedJob = nil
+            FinishJournalList(panels, matches)
+        end,
+        onCancel = function()
+            journalUncollectedJob = nil
+        end,
+    })
+end
+
 function RefreshJournalList(panels)
+    CancelUncollectedFilter()
     wipe(listResults)
     if panels.listScrollFrame and panels.listScrollFrame.SetVerticalScroll then
         panels.listScrollFrame:SetVerticalScroll(0)
@@ -1837,15 +1899,23 @@ function RefreshJournalList(panels)
     end
 
     if hasUncollectedOnly then
-        local filtered = {}
-        for _, inst in ipairs(sorted) do
-            addon.EnsureEncounters(inst)
-            if InstanceHasUncollected(inst, addon) then
-                tinsert(filtered, inst)
-            end
-        end
-        sorted = filtered
+        StartUncollectedFilter(panels, sorted)
+        return
     end
+
+    FinishJournalList(panels, sorted)
+end
+
+--- Bountiful filter, favourites hoist, list population and selection restore.
+--- Split out of RefreshJournalList so the chunked uncollected filter can run the
+--- same tail once its walk finishes.
+---@param panels table
+---@param sorted table
+FinishJournalList = function(panels, sorted)
+    local addon = GetDataAddon()
+    -- The chunked filter paints partial results into listResults as it goes, and
+    -- the bountiful pass below can still shrink the set, so start from empty.
+    wipe(listResults)
 
     if showBountifulOnly then
         local filtered = {}
