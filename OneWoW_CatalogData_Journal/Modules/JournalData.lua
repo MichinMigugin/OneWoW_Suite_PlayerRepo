@@ -84,12 +84,35 @@ function JournalData:DetermineItemSpecial(idata)
         return "Pet"
     end
 
-    if idata.isToy then
+    if idata.isToy or idata.toyID then
         return "Toy"
     end
 
     if idata.isTransmog then
         return "TMog"
+    end
+
+    local classID = idata.classID
+    local subclassID = idata.subclassID
+    if classID == Enum.ItemClass.Recipe then
+        return "Recipe"
+    end
+    if classID == Enum.ItemClass.Questitem then
+        return "Quest"
+    end
+    if classID == Enum.ItemClass.Housing then
+        return "Housing"
+    end
+    if classID == Enum.ItemClass.Battlepet then
+        return "Pet"
+    end
+    if classID == Enum.ItemClass.Miscellaneous then
+        if subclassID == Enum.ItemMiscellaneousSubclass.Mount then
+            return "Mount"
+        end
+        if subclassID == Enum.ItemMiscellaneousSubclass.CompanionPet then
+            return "Pet"
+        end
     end
 
     local itemType    = idata.itemType    or ""
@@ -115,21 +138,57 @@ function JournalData:DetermineItemSpecial(idata)
         return "Pet"
     end
 
-    if itemType == "Miscellaneous" or itemType == "Consumable" then
-        local itemID = idata.itemID
-        if itemID then
-            local _, _, _, isToy = C_ToyBox.GetToyInfo(itemID)
-            if isToy then return "Toy" end
+    return nil
+end
 
-            local mountID = C_MountJournal.GetMountFromItem(itemID)
-            if mountID then return "Mount" end
-
-            local _, _, _, _, _, _, _, _, _, _, _, _, speciesID = C_PetJournal.GetPetInfoByItemID(itemID)
-            if speciesID and speciesID > 0 then return "Pet" end
-        end
+--- Toy / mount / pet journal probes for leftover Misc or Consumable rows.
+--- Not called for every loot item: Enum class/subclass already covers most.
+---@param idata table
+---@return string|nil special
+local function ProbeCollectibleSpecial(idata)
+    local itemID = idata and idata.itemID
+    if not itemID then
+        return nil
+    end
+    local classID = idata.classID
+    local itemType = idata.itemType or ""
+    local isMisc = classID == Enum.ItemClass.Miscellaneous or itemType == "Miscellaneous"
+    local isConsumable = classID == Enum.ItemClass.Consumable or itemType == "Consumable"
+    if not isMisc and not isConsumable then
+        return nil
     end
 
+    local _, _, _, isToy = C_ToyBox.GetToyInfo(itemID)
+    if isToy then
+        idata.isToy = true
+        return "Toy"
+    end
+
+    local mountID = C_MountJournal.GetMountFromItem(itemID)
+    if mountID then
+        idata.mountID = mountID
+        return "Mount"
+    end
+
+    local speciesID = select(13, C_PetJournal.GetPetInfoByItemID(itemID))
+    if speciesID and speciesID > 0 then
+        idata.speciesID = speciesID
+        return "Pet"
+    end
     return nil
+end
+
+---@param encounters table
+local function ProbeLeftoverSpecials(encounters)
+    for i = 1, #encounters do
+        local items = encounters[i].items
+        for j = 1, #items do
+            local item = items[j]
+            if not item.special then
+                item.special = ProbeCollectibleSpecial(item.itemData or {})
+            end
+        end
+    end
 end
 
 -- Prefer the player's faction source quest, else the first listed source.
@@ -240,26 +299,22 @@ end
 ---@param itemID number
 ---@return table
 local function ItemDataFromClient(itemID)
-    local name, link, quality, _, _, itemType, itemSubType, _, itemEquipLoc, icon = C_Item.GetItemInfo(itemID)
-    if not icon then
-        local _, instantType, instantSub, instantLoc, instantIcon = C_Item.GetItemInfoInstant(itemID)
-        itemType = itemType or instantType
-        itemSubType = itemSubType or instantSub
-        itemEquipLoc = itemEquipLoc or instantLoc
-        icon = instantIcon
-    end
-    if not name then
-        C_Item.RequestLoadItemDataByID(itemID)
-    end
+    -- Instant + name/quality by ID. Never GetItemInfo / RequestLoadItemDataByID
+    -- here: that storm was the hitch when opening a raid card.
+    local _, itemType, itemSubType, itemEquipLoc, icon, classID, subclassID =
+        C_Item.GetItemInfoInstant(itemID)
+    local name = C_Item.GetItemNameByID(itemID)
+    local quality = C_Item.GetItemQualityByID(itemID)
     return {
         itemID      = itemID,
         name        = name,
         icon        = icon or 134400,
-        quality     = quality or 1,
+        quality     = quality == nil and 1 or quality,
         itemType    = itemType or "",
         itemSubType = itemSubType or "",
+        classID     = classID,
+        subclassID  = subclassID,
         isTransmog  = itemEquipLoc and itemEquipLoc ~= "" and itemEquipLoc ~= "INVTYPE_NON_EQUIP_IGNORE" or false,
-        link        = link,
         source      = "ej",
     }
 end
@@ -289,6 +344,34 @@ local function AddExtraEntry(extrasByKey, key, itemID, itemData, loc)
     })
 end
 
+local function MergeExtrasLists(a, b)
+    if not a or #a == 0 then
+        return b
+    end
+    if not b or #b == 0 then
+        return a
+    end
+    local seen = {}
+    local out = {}
+    for i = 1, #a do
+        local entry = a[i]
+        local itemID = entry.itemID
+        if itemID and not seen[itemID] then
+            seen[itemID] = true
+            tinsert(out, entry)
+        end
+    end
+    for i = 1, #b do
+        local entry = b[i]
+        local itemID = entry.itemID
+        if itemID and not seen[itemID] then
+            seen[itemID] = true
+            tinsert(out, entry)
+        end
+    end
+    return out
+end
+
 ---@param encByID table
 ---@param encountersGlobal table|nil
 ---@param fallbackEncounters table
@@ -303,6 +386,7 @@ function JournalData:BuildEncountersForInstance(encByID, encountersGlobal, fallb
             itemID       = entry.itemID,
             itemData     = idata,
             name         = idata.name or L["JOURNAL_UNKNOWN_ITEM"],
+            nameResolved = idata.name ~= nil,
             icon         = idata.icon or 134400,
             quality      = idata.quality or 1,
             special      = self:DetermineItemSpecial(idata),
@@ -404,6 +488,7 @@ function JournalData:BuildEJEncounters(instanceID)
                 itemID       = row.itemID,
                 itemData     = idata,
                 name         = idata.name or L["JOURNAL_UNKNOWN_ITEM"],
+                nameResolved = idata.name ~= nil,
                 icon         = idata.icon,
                 quality      = idata.quality,
                 special      = self:DetermineItemSpecial(idata),
@@ -455,13 +540,18 @@ function JournalData:BuildExtrasEncounter(extras)
     local items = {}
     for _, entry in ipairs(extras) do
         local idata = entry.itemData
+        local special = self:DetermineItemSpecial(idata or {})
+        if not special then
+            special = ProbeCollectibleSpecial(idata or {})
+        end
         tinsert(items, {
             itemID       = entry.itemID,
             itemData     = idata,
             name         = (idata and idata.name) or L["JOURNAL_UNKNOWN_ITEM"],
+            nameResolved = (idata and idata.name) ~= nil,
             icon         = (idata and idata.icon) or 134400,
             quality      = (idata and idata.quality) or 1,
-            special      = self:DetermineItemSpecial(idata or {}),
+            special      = special,
             difficulties = entry.difficulties or {},
             source       = entry.source or "att",
             questSources = idata and idata.questSources,
@@ -548,6 +638,32 @@ local function AchievementsFor(mapID, instanceType)
     return (src and src[mapID]) or {}
 end
 
+---@param instanceID number
+---@return number
+local function CountGeneratedLoot(instanceID)
+    local loot = ns.JournalLoot and ns.JournalLoot[instanceID]
+    if not loot then
+        return 0
+    end
+    local seen = {}
+    local n = 0
+    for i = 1, #loot do
+        local itemID = loot[i].itemID
+        if itemID and not seen[itemID] then
+            seen[itemID] = true
+            n = n + 1
+        end
+    end
+    return n
+end
+
+---@param instanceID number
+---@return number
+local function CountGeneratedBosses(instanceID)
+    local encs = ns.JournalEncounters and ns.JournalEncounters[instanceID]
+    return encs and #encs or 0
+end
+
 ---@param expansionID number
 ---@param instanceID number
 ---@param orderIndex number|nil
@@ -604,7 +720,20 @@ local function MakeCacheEntry(expansionID, instanceID, orderIndex, instInfo, enc
         entranceSource     = entranceSource,
         achievements       = AchievementsFor(mapID, instanceType),
     }
-    ApplyTotals(entry, encounters)
+    -- Skeleton cards skip ApplyTotals / C_Item. Hydrate via EnsureEncounters.
+    if instanceType == "delve" then
+        entry.encountersHydrated = true
+        entry.totalItems = 0
+        entry.bossCount = 0
+    elseif instanceType == "world" and (not instanceID or instanceID == 0) then
+        entry.encountersHydrated = false
+        entry.totalItems = 0
+        entry.bossCount = 0
+    else
+        entry.encountersHydrated = false
+        entry.totalItems = CountGeneratedLoot(instanceID)
+        entry.bossCount = CountGeneratedBosses(instanceID)
+    end
     return entry
 end
 
@@ -615,128 +744,15 @@ function JournalData:BuildJournalCache()
     local membership = ns.JournalTierMembership
     local overrides = ns.JournalListingOverrides or { forceHide = {}, forceShow = {} }
 
-    local ejItemOnInst = {}
-    if ns.JournalLoot then
-        for instanceID, rows in pairs(ns.JournalLoot) do
-            local set = {}
-            for _, row in ipairs(rows) do
-                set[row.itemID] = true
-            end
-            ejItemOnInst[instanceID] = set
-        end
-    end
-
-    -- Extras keyed by CacheKey. Legacy ATT tables stay expansion-scoped (no union).
-    local extrasByKey = {}
-
-    local function IsEJItem(instanceID, itemID)
-        local set = instanceID and ejItemOnInst[instanceID]
-        return set and set[itemID] == true
-    end
-
-    for _, expansion in ipairs(expansionList) do
-        local extrasGlobal = _G["OneWoWExtras_" .. expansion.name]
-        if extrasGlobal then
-            for _, row in ipairs(extrasGlobal) do
-                local itemID = row.itemID
-                if itemID then
-                    local instID = row.instanceID
-                    local isWorld = row.world == true or (not instID or instID == 0)
-                    if not isWorld and IsEJItem(instID, itemID) then
-                        -- already on the Adventure Guide page
-                    else
-                        local key = isWorld
-                            and self.CacheKey(expansion.expansionID, 0, "world")
-                            or self.CacheKey(expansion.expansionID, instID)
-                        AddExtraEntry(extrasByKey, key, itemID, row, row)
-                    end
-                end
-            end
-        end
-
-        local itemsGlobal = _G["OneWoWItems_" .. expansion.name]
-        if itemsGlobal then
-            for itemID, itemData in pairs(itemsGlobal) do
-                if itemData.locations then
-                    for _, loc in ipairs(itemData.locations) do
-                        local instID = loc.instanceID
-                        local isWorld = loc.world == true or (not instID or instID == 0)
-                        if not isWorld and IsEJItem(instID, itemID) then
-                            -- skip Adventure Guide duplicates
-                        elseif isWorld then
-                            AddExtraEntry(
-                                extrasByKey,
-                                self.CacheKey(expansion.expansionID, 0, "world"),
-                                itemID, itemData, loc
-                            )
-                        elseif instID then
-                            AddExtraEntry(
-                                extrasByKey,
-                                self.CacheKey(expansion.expansionID, instID),
-                                itemID, itemData, loc
-                            )
-                        end
-                    end
-                end
-            end
-        end
-    end
-
-    local function MergeExtrasLists(a, b)
-        if not a or #a == 0 then
-            return b
-        end
-        if not b or #b == 0 then
-            return a
-        end
-        local seen = {}
-        local out = {}
-        for i = 1, #a do
-            local entry = a[i]
-            local itemID = entry.itemID
-            if itemID and not seen[itemID] then
-                seen[itemID] = true
-                tinsert(out, entry)
-            end
-        end
-        for i = 1, #b do
-            local entry = b[i]
-            local itemID = entry.itemID
-            if itemID and not seen[itemID] then
-                seen[itemID] = true
-                tinsert(out, entry)
-            end
-        end
-        return out
-    end
-
-    local function FinishEncounters(expansionID, instanceID, instanceType)
-        local key = self.CacheKey(expansionID, instanceID, instanceType)
-        local encounters = {}
-        if instanceType ~= "world" or (instanceID and instanceID > 0) then
-            encounters = self:BuildEJEncounters(instanceID)
-        end
-        local extras = extrasByKey[key]
-        -- Outdoor extras are keyed exp:world. MoP+ hub cards also need that pile.
-        if ns.JournalWorldHubs and ns.JournalWorldHubs[instanceID] then
-            extras = MergeExtrasLists(extras, extrasByKey[self.CacheKey(expansionID, 0, "world")])
-        end
-        local extrasEnc = self:BuildExtrasEncounter(extras)
-        if extrasEnc then
-            tinsert(encounters, extrasEnc)
-        end
-        sort(encounters, SortEncounters)
-        return encounters
-    end
-
+    -- Skeleton cards only: names, map, achievements, Generated loot/boss counts.
+    -- Loot rows and ATT extras hydrate in EnsureEncounters (one card at a time).
     local function AddCard(expansionID, instanceID, orderIndex)
         local key = self.CacheKey(expansionID, instanceID)
         if overrides.forceHide and overrides.forceHide[key] then
             return
         end
-        local encounters = FinishEncounters(expansionID, instanceID)
         self.journalCache[key] = MakeCacheEntry(
-            expansionID, instanceID, orderIndex, nil, encounters
+            expansionID, instanceID, orderIndex, nil, {}
         )
     end
 
@@ -750,13 +766,12 @@ function JournalData:BuildJournalCache()
         end
         local exp = expansionByID[expansionID]
         local name = (exp and exp.displayName or tostring(expansionID)) .. " - " .. WORLD
-        local encounters = FinishEncounters(expansionID, 0, "world")
         self.journalCache[key] = MakeCacheEntry(
             expansionID,
             0,
             0,
             { name = name, instanceType = "world" },
-            encounters
+            {}
         )
     end
 
@@ -823,12 +838,6 @@ function JournalData:BuildJournalCache()
             end
         end
     end
-
-    collectgarbage("collect")
-
-    if ns.EJLiveLoot and ns.EJLiveLoot.ScheduleAfterStaticBuild then
-        ns.EJLiveLoot:ScheduleAfterStaticBuild()
-    end
 end
 
 function JournalData:SortEncountersInPlace(inst)
@@ -839,6 +848,139 @@ end
 function JournalData:RecalculateInstanceTotals(inst)
     if not inst or not inst.encounters then return end
     ApplyTotals(inst, inst.encounters)
+end
+
+function JournalData:EnsureEJItemSets()
+    if self.ejItemOnInst then
+        return
+    end
+    self.ejItemOnInst = {}
+    if not ns.JournalLoot then
+        return
+    end
+    for instanceID, rows in pairs(ns.JournalLoot) do
+        local set = {}
+        for i = 1, #rows do
+            local itemID = rows[i].itemID
+            if itemID then
+                set[itemID] = true
+            end
+        end
+        self.ejItemOnInst[instanceID] = set
+    end
+end
+
+--- Bucket ATT extras for one expansion. No C_Item. Idempotent per expansionID.
+---@param expansionID number
+function JournalData:EnsureExtrasForExpansion(expansionID)
+    self.extrasByKey = self.extrasByKey or {}
+    self.extrasReady = self.extrasReady or {}
+    if self.extrasReady[expansionID] then
+        return
+    end
+    local exp = expansionByID[expansionID]
+    if not exp then
+        self.extrasReady[expansionID] = true
+        return
+    end
+    self:EnsureEJItemSets()
+    local extrasByKey = self.extrasByKey
+    local function IsEJItem(instanceID, itemID)
+        local set = instanceID and self.ejItemOnInst[instanceID]
+        return set and set[itemID] == true
+    end
+
+    local extrasGlobal = _G["OneWoWExtras_" .. exp.name]
+    if extrasGlobal then
+        for _, row in ipairs(extrasGlobal) do
+            local itemID = row.itemID
+            if itemID then
+                local instID = row.instanceID
+                local isWorld = row.world == true or (not instID or instID == 0)
+                if isWorld or not IsEJItem(instID, itemID) then
+                    local key = isWorld
+                        and self.CacheKey(expansionID, 0, "world")
+                        or self.CacheKey(expansionID, instID)
+                    AddExtraEntry(extrasByKey, key, itemID, row, row)
+                end
+            end
+        end
+    end
+
+    local itemsGlobal = _G["OneWoWItems_" .. exp.name]
+    if itemsGlobal then
+        for itemID, itemData in pairs(itemsGlobal) do
+            if itemData.locations then
+                for _, loc in ipairs(itemData.locations) do
+                    local instID = loc.instanceID
+                    local isWorld = loc.world == true or (not instID or instID == 0)
+                    if not isWorld and IsEJItem(instID, itemID) then
+                        -- skip Adventure Guide duplicates
+                    elseif isWorld then
+                        AddExtraEntry(
+                            extrasByKey,
+                            self.CacheKey(expansionID, 0, "world"),
+                            itemID, itemData, loc
+                        )
+                    elseif instID then
+                        AddExtraEntry(
+                            extrasByKey,
+                            self.CacheKey(expansionID, instID),
+                            itemID, itemData, loc
+                        )
+                    end
+                end
+            end
+        end
+    end
+    self.extrasReady[expansionID] = true
+end
+
+local function AttachHydratedEncounters(inst, encounters)
+    inst.encounters = encounters
+    ApplyTotals(inst, encounters)
+    inst.encountersHydrated = true
+    inst.bossCount = nil
+end
+
+--- Hydrate loot for one card. Idempotent. Dual-listed remakes hydrate separately
+--- (extras stay expansion-scoped).
+---@param inst table
+---@return table inst
+function JournalData:EnsureEncounters(inst)
+    if not inst or inst.encountersHydrated then
+        return inst
+    end
+    self:BuildJournalCache()
+    if inst.instanceType == "delve" then
+        inst.encountersHydrated = true
+        return inst
+    end
+
+    local expansionID = inst.expansionID
+    local instanceID = inst.instanceID
+    local instanceType = inst.instanceType
+    self:EnsureExtrasForExpansion(expansionID)
+
+    local key = inst.cacheKey or self.CacheKey(expansionID, instanceID, instanceType)
+    local extrasByKey = self.extrasByKey or {}
+    local encounters = {}
+    if instanceType ~= "world" or (instanceID and instanceID > 0) then
+        encounters = self:BuildEJEncounters(instanceID)
+    end
+    local extras = extrasByKey[key]
+    if ns.JournalWorldHubs and ns.JournalWorldHubs[instanceID] then
+        extras = MergeExtrasLists(extras, extrasByKey[self.CacheKey(expansionID, 0, "world")])
+    end
+    local extrasEnc = self:BuildExtrasEncounter(extras)
+    if extrasEnc then
+        tinsert(encounters, extrasEnc)
+    end
+    sort(encounters, SortEncounters)
+
+    ProbeLeftoverSpecials(encounters)
+    AttachHydratedEncounters(inst, encounters)
+    return inst
 end
 
 function JournalData:GetAllInstances()
@@ -862,7 +1004,7 @@ function JournalData:GetSortedInstances(expansionFilter, searchText, instanceTyp
         local passesType = (not instanceTypeFilter or instanceTypeFilter == "all"
                             or inst.instanceType == instanceTypeFilter)
 
-        -- Membership cards with empty encounters stay visible (live merge pending).
+        -- Skeleton cards have empty encounters until EnsureEncounters.
         if passesExpansion and passesSearch and passesType then
             tinsert(result, inst)
         end
@@ -926,7 +1068,9 @@ function JournalData:GetInstanceByMapID(mapID)
     if #all == 0 then
         return nil
     end
-    return all[#all]
+    local inst = all[#all]
+    self:EnsureEncounters(inst)
+    return inst
 end
 
 JournalData.bountifulMapIDs = {}
@@ -963,27 +1107,38 @@ local function WalkDelveMaps(self, startID, seenMaps, poiToMap, nameToMap)
 end
 
 --- Live bountiful doors this week. atlasName or generated bountifulPoiID.
+-- Reads DelveMembership / DelveEntrances only. Must not call BuildJournalCache:
+-- PEW runs this for every login, and hydrating every journal card there stalls movement.
 function JournalData:RefreshBountiful()
     wipe(self.bountifulMapIDs)
-    self:BuildJournalCache()
 
     local nameToMap = {}
     local poiToMap = {}
-    for _, inst in pairs(self.journalCache) do
-        if inst.instanceType == "delve" and inst.mapID then
-            nameToMap[inst.name] = inst.mapID
-            for _, row in ipairs(inst.entrances or {}) do
-                if row.bountifulPoiID then
-                    poiToMap[row.bountifulPoiID] = inst.mapID
+    local membership = ns.DelveMembership
+    if membership then
+        for _, cards in pairs(membership) do
+            for mapID, info in pairs(cards) do
+                if info and info.name then
+                    nameToMap[info.name] = mapID
                 end
             end
         end
     end
 
     local seenMaps = {}
-    for _, inst in pairs(self.journalCache) do
-        if inst.instanceType == "delve" then
-            for _, row in ipairs(inst.entrances or {}) do
+    local entrances = ns.DelveEntrances
+    if entrances then
+        for mapID, rows in pairs(entrances) do
+            for i = 1, #rows do
+                local row = rows[i]
+                if row.bountifulPoiID then
+                    poiToMap[row.bountifulPoiID] = mapID
+                end
+            end
+        end
+        for _, rows in pairs(entrances) do
+            for i = 1, #rows do
+                local row = rows[i]
                 if row.mapID and row.mapID ~= 0 then
                     local uiMapID = C_Map.GetMapPosFromWorldPos(row.mapID, CreateVector2D(row.x, row.y))
                     WalkDelveMaps(self, uiMapID, seenMaps, poiToMap, nameToMap)
@@ -1007,6 +1162,9 @@ end
 
 function JournalData:ClearCache()
     self.journalCache = nil
+    self.extrasByKey = nil
+    self.extrasReady = nil
+    self.ejItemOnInst = nil
     wipe(self.bountifulMapIDs)
     if ns.EJLiveLoot and ns.EJLiveLoot.OnJournalCacheCleared then
         ns.EJLiveLoot:OnJournalCacheCleared()

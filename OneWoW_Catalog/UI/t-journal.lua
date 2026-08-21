@@ -22,6 +22,20 @@ local achievementsExpanded = true
 local panels_ref = nil
 local RefreshJournalList
 local RefreshDetailView
+local nameFillRefreshPending = false
+
+local function ScheduleNameFillRefresh()
+    if nameFillRefreshPending then
+        return
+    end
+    nameFillRefreshPending = true
+    C_Timer.After(0, function()
+        nameFillRefreshPending = false
+        if selectedInstance then
+            RefreshDetailView(true)
+        end
+    end)
+end
 
 -- Multi-select Item Type filter: keys from ITEM_TYPE_DEFS map to item.special values.
 -- Empty table = "Show All" (no filter applied).
@@ -81,14 +95,18 @@ local function ResetItemTypeFilter()
 end
 
 local function CountBossEncounters(instData)
-    local n = 0
-    for _, enc in ipairs(instData.encounters or {}) do
-        -- Real bosses only; skip General (0), Achievement (-2), Quest (-3).
-        if enc.encounterID and enc.encounterID > 0 then
-            n = n + 1
+    local encounters = instData.encounters
+    if encounters and #encounters > 0 then
+        local n = 0
+        for _, enc in ipairs(encounters) do
+            -- Real bosses only; skip General (0), Achievement (-2), Quest (-3).
+            if enc.encounterID and enc.encounterID > 0 then
+                n = n + 1
+            end
         end
+        return n
     end
-    return n
+    return instData.bossCount or 0
 end
 
 local function FormatBossCount(n)
@@ -227,6 +245,80 @@ end
 
 local function GetDataAddon()
     return OneWoW_CatalogData_Journal_API
+end
+
+--- Fill name / icon / quality for a visible loot row. Hydrate stays Instant-only;
+--- RequestLoadItemDataByID runs here, for this row, via the store item loader.
+---@param item table
+---@param row Frame
+---@param nameFS FontString
+---@param iconTex Texture
+---@param iconFrame Frame
+---@param includeGuideMark boolean|nil
+local function FillVisibleItemRow(item, row, nameFS, iconTex, iconFrame, includeGuideMark)
+    local addon = GetDataAddon()
+    if not addon or not item or not item.itemID then
+        return
+    end
+    -- nameResolved comes from the data store: the placeholder string lives in the
+    -- Journal store's locale scope, so Catalog cannot compare against it.
+    if item.nameResolved then
+        return
+    end
+    local token = {}
+    row._journalFillToken = token
+    local function paint(result)
+        if not result then
+            return
+        end
+        if result.name then
+            item.name = result.name
+            item.nameResolved = true
+            if item.itemData then
+                item.itemData.name = result.name
+            end
+        end
+        if result.icon then
+            item.icon = result.icon
+        end
+        if result.quality ~= nil then
+            item.quality = result.quality
+            if item.itemData then
+                item.itemData.quality = result.quality
+            end
+        end
+        if result.link and item.itemData then
+            item.itemData.link = result.link
+        end
+        local canPaint = row._journalFillToken == token and row:IsShown()
+        if not canPaint then
+            if result.name then
+                ScheduleNameFillRefresh()
+            end
+            return
+        end
+        if result.name then
+            local displayName = item.name
+            if includeGuideMark and item.fromLiveEJ then
+                displayName = displayName .. " |cff888888(" .. GUIDE .. ")|r"
+            end
+            nameFS:SetText(displayName)
+        end
+        if result.icon then
+            iconTex:SetTexture(result.icon)
+        end
+        if result.quality ~= nil then
+            local qr, qg, qb = OneWoW_GUI:GetItemQualityColor(result.quality)
+            iconFrame:SetBackdropBorderColor(qr, qg, qb)
+            nameFS:SetTextColor(qr, qg, qb)
+        end
+    end
+    local cached = addon.LoadItemData(item.itemID, function(_, result)
+        paint(result)
+    end)
+    if cached then
+        paint(cached)
+    end
 end
 
 -- Tooltips use the difficulty-scaled Encounter Journal link (captured per
@@ -1004,6 +1096,8 @@ local function BuildQuestItemRow(parent, item, yOffset)
     itemName:SetText(item.name)
     itemName:SetTextColor(OneWoW_GUI:GetItemQualityColor(item.quality))
 
+    FillVisibleItemRow(item, itemRow, itemName, iconTex, iconFrame, false)
+
     itemRow:EnableMouse(true)
     itemRow:SetScript("OnEnter", function(myself)
         myself:SetBackdropColor(OneWoW_GUI:GetThemeColor("BG_HOVER"))
@@ -1539,6 +1633,8 @@ RefreshDetailView = function(isSecondRefresh)
                 itemName:SetText(displayName)
                 itemName:SetTextColor(OneWoW_GUI:GetItemQualityColor(item.quality))
 
+                FillVisibleItemRow(item, itemRow, itemName, iconTex, iconFrame, true)
+
                 local diffText = OneWoW_GUI:CreateFS(itemRow, 10)
                 diffText:SetPoint("RIGHT", itemRow, "RIGHT", COL_DIFF_RIGHT, 0)
                 diffText:SetJustifyH("RIGHT")
@@ -1631,6 +1727,13 @@ local function ShowInstanceDetail(panels, instData)
 
     local dataAddon = GetDataAddon()
     if dataAddon then
+        dataAddon.EnsureEncounters(instData)
+        if instData.instanceType ~= "delve" and instData.instanceID and instData.instanceID > 0 then
+            dataAddon.SetLiveMergeTarget(instData)
+            dataAddon.MergeInstance(instData)
+        else
+            dataAddon.SetLiveMergeTarget(nil)
+        end
         dataAddon.MergeLiveATTExtras(instData)
     end
 
@@ -1736,6 +1839,7 @@ function RefreshJournalList(panels)
     if hasUncollectedOnly then
         local filtered = {}
         for _, inst in ipairs(sorted) do
+            addon.EnsureEncounters(inst)
             if InstanceHasUncollected(inst, addon) then
                 tinsert(filtered, inst)
             end
@@ -1822,7 +1926,13 @@ function RefreshJournalList(panels)
 
     if journalListAPI then
         if keepIndex then
-            journalListAPI.SetSelectedIndex(keepIndex)
+            -- Restoring the same row must not re-fire onSelect. That re-enters
+            -- ShowInstanceDetail → MergeInstance → this refresh (stack overflow).
+            if journalListAPI.GetSelectedIndex() == keepIndex then
+                journalListAPI.Refresh()
+            else
+                journalListAPI.SetSelectedIndex(keepIndex)
+            end
         else
             journalListAPI.SetSelectedIndex(nil)
             journalListAPI.Refresh()
@@ -2259,6 +2369,10 @@ function ns.UI.CreateJournalTab(parent)
         mainWindow._oneWoWJournalBountifulReset = true
         mainWindow:HookScript("OnHide", function()
             local p = panels_ref or ns.UI.journalPanels
+            local addon = GetDataAddon()
+            if addon then
+                addon.SetLiveMergeTarget(nil)
+            end
             ResetBountifulFilter(p)
             if p then
                 InvalidateJournalFilterCache()
@@ -2288,21 +2402,31 @@ function ns.UI.CreateJournalTab(parent)
         panels.detailScrollChild:SetHeight(100)
 
         if addon.RegisterScanCallback then
-            addon.RegisterScanCallback(function()
-                InvalidateJournalFilterCache()
+            addon.RegisterScanCallback(function(reason)
                 local p = ns.UI.journalPanels
-                if p then
-                    RefreshJournalList(p)
-                    if selectedInstance then
-                        local keepKey = JournalCacheKey(selectedInstance)
-                        for _, inst in ipairs(listResults) do
-                            if JournalCacheKey(inst) == keepKey then
-                                selectedInstance = inst
-                                break
-                            end
-                        end
-                        ShowInstanceDetail(p, selectedInstance)
+                if not p then return end
+                -- Per-card live merge: refresh the open card and list chrome only.
+                -- RefreshJournalList re-selects and would re-enter MergeInstance.
+                if reason == "ej_merge" then
+                    if journalListAPI then
+                        journalListAPI.Refresh()
                     end
+                    if selectedInstance then
+                        RefreshDetailView(false)
+                    end
+                    return
+                end
+                InvalidateJournalFilterCache()
+                RefreshJournalList(p)
+                if selectedInstance then
+                    local keepKey = JournalCacheKey(selectedInstance)
+                    for _, inst in ipairs(listResults) do
+                        if JournalCacheKey(inst) == keepKey then
+                            selectedInstance = inst
+                            break
+                        end
+                    end
+                    RefreshDetailView(false)
                 end
             end)
         end

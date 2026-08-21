@@ -33,6 +33,34 @@ expansion-scoped. A live overlay runs only if AllTheThings is already loaded
 
 Favorites and list selection use the same key.
 
+## Lazy hydrate
+
+The in-memory card index is cheap: membership, delves, synthetic World, Generated
+loot counts and boss counts. Encounter rows (`C_Item`, ATT extras) load in
+`EnsureEncounters` for **one card** when you open details, toast, or ESC
+collection, or when Has uncollected filters the current list.
+
+`GetInstanceByMapID` hydrates only the preferred card for that map. It must not
+build loot for every dungeon and raid.
+
+List cards use Generated item/boss counts so they paint without hydrating. Taxonomy
+tags (`hasTMog`, and so on) fill in after that card hydrates.
+
+Hydrate itself is Instant-only: `C_Item.GetItemInfoInstant` plus
+`GetItemNameByID` / `GetItemQualityByID`. It must not call `GetItemInfo` or
+`RequestLoadItemDataByID` for every loot row (that was the hitch on a large
+raid card). ToyBox / Mount / Pet journal probes run only for leftover
+Miscellaneous or Consumable rows on that card, not for armor and weapons.
+Visible detail rows that still lack a name load through the store item loader.
+
+Because hydrate is Instant-only, a loot row may carry the localized
+`JOURNAL_UNKNOWN_ITEM` placeholder. Every row therefore also carries
+`nameResolved` (boolean): false means "still the placeholder, go fetch it". The
+live EJ merge and the item loader set it true when they fill a real name.
+Consumers must branch on `nameResolved`, never compare against the placeholder
+string — that key lives in this store's locale scope, so another addon
+re-localizing it gets the key name back instead of the translation.
+
 ## World
 
 MoP–Midnight outdoor hubs in EJ are typed `world` (not raid). IDs live in
@@ -48,6 +76,8 @@ Delves are not Encounter Journal instances. Cards come from `DelveMembership`
 `instanceType = "delve"`. Pins use `DelveEntrances`. Achievements use
 `DelveAchievements` (Stories/Discoveries + expansion Glory + matching lair solos).
 There is no EJ loot table; the items section stays empty.
+Weekly bountiful doors (`RefreshBountiful`) read `DelveMembership` names and
+`DelveEntrances` pins/POIs only — never the journal loot cache.
 
 ## Generated files
 
@@ -82,8 +112,12 @@ Agent skill: `onewow-db2` (when to use extracts vs FrameXML / ATT).
 
 ## Live EJ merge
 
-`EJLiveLoot` selects the card’s EJ tier (`EJ_SelectTier`), then scans
+Live merge is **per card** (`MergeInstance`), never a login walk of every
+instance. `EJLiveLoot` selects the card’s EJ tier (`EJ_SelectTier`), then scans
 difficulties from MapDifficulties / `EJ_IsValidInstanceDifficulty` (includes
 legacy 10/25 and dungeon Timewalking). It updates names and item links only.
 It does not invent encounters or add items. World hubs use `JournalWorldHubs`
-for the difficulty scan. Cards with `instanceID == 0` are skipped.
+for the difficulty scan. Cards with `instanceID == 0` and delves are skipped.
+`EJ_LOOT_DATA_RECIEVED` (Blizzard’s spelling) refreshes the open card only when
+`SetLiveMergeTarget` is set; it does not rebuild the world cache.
+Hover tooltips still resolve a scaled link via `GetScaledLootLink`.
