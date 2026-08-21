@@ -192,6 +192,7 @@ function ns.UI.CreateTrackerTab(parent)
 
     local detailTitle = OneWoW_GUI:CreateFS(detailPanel, 12)
     detailTitle:SetJustifyH("LEFT")
+    detailTitle:SetWordWrap(false)
     detailTitle:SetTextColor(OneWoW_GUI:GetThemeColor("TEXT_ACCENT"))
     detailTitle:Hide()
 
@@ -225,8 +226,6 @@ function ns.UI.CreateTrackerTab(parent)
     end)
     pinBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
-    detailTitle:SetPoint("LEFT", pinBtn, "RIGHT", 6, 0)
-
     local hideStepsCheck = OneWoW_GUI:CreateCheckbox(detailPanel, {
         label = L["TRACKER_PIN_HIDE_COMPLETED"],
         labelSide = "left",
@@ -250,19 +249,44 @@ function ns.UI.CreateTrackerTab(parent)
     hideStepsCheck:SetScript("OnLeave", function() GameTooltip:Hide() end)
     hideStepsCheck.label:SetScript("OnEnter", HideStepsTooltip)
     hideStepsCheck.label:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    detailTitle:SetPoint("RIGHT", hideStepsCheck.label, "LEFT", -8, 0)
 
     local detailScrollFrame, detailScrollChild = OneWoW_GUI:CreateScrollFrame(detailPanel, {})
     local function LayoutDetailScroll()
         detailScrollFrame:ClearAllPoints()
-        if hideStepsCheck:IsShown() then
+        -- Farm value hides Hide completed but still uses the pin/title strip.
+        if pinBtn:IsShown() then
             detailScrollFrame:SetPoint("TOPLEFT", detailPanel, "TOPLEFT", 6, -34)
         else
             detailScrollFrame:SetPoint("TOPLEFT", detailPanel, "TOPLEFT", 6, -6)
         end
         detailScrollFrame:SetPoint("BOTTOMRIGHT", detailPanel, "BOTTOMRIGHT", -6, 4)
+        pinBtn:SetFrameLevel((detailScrollFrame:GetFrameLevel() or 0) + 5)
+        detailTitle:ClearAllPoints()
+        detailTitle:SetPoint("LEFT", pinBtn, "RIGHT", 6, 0)
+        if hideStepsCheck:IsShown() then
+            detailTitle:SetPoint("RIGHT", hideStepsCheck.label, "LEFT", -8, 0)
+        else
+            detailTitle:SetPoint("RIGHT", detailPanel, "RIGHT", -8, 0)
+        end
     end
     LayoutDetailScroll()
+
+    local SCROLL_GUTTER = OneWoW_GUI.Constants.GUI.SCROLLBAR_CONTENT_GUTTER or 24
+    local layingOutDetail = false
+    local lastDetailLayoutW = 0
+    local pendingDetailLayout = false
+    -- Wrap width must be SetWidth'd; LEFT+RIGHT anchors are not laid out until
+    -- a later size pass (resize grabber), so GetStringHeight stays one line.
+    local function DetailContentWidth()
+        local w = detailScrollFrame:GetWidth() or 0
+        if w < 50 then
+            w = detailPanel:GetWidth() or 0
+        end
+        if w >= 50 then
+            return math.max(1, w - SCROLL_GUTTER)
+        end
+        return detailScrollChild:GetWidth() or 0
+    end
 
     local emptyLabel = OneWoW_GUI:CreateFS(detailPanel, 12)
     emptyLabel:SetPoint("CENTER", detailPanel, "CENTER", 0, 0)
@@ -557,11 +581,15 @@ function ns.UI.CreateTrackerTab(parent)
     end
 
     function parent.ShowDetail(listID)
+        if layingOutDetail then return end
+        layingOutDetail = true
+
         ClearDetail()
 
         local list = TD:GetList(listID)
         if not list then
             TE:SetObservedList(nil)
+            layingOutDetail = false
             return
         end
         TE:SetObservedList(listID)
@@ -709,7 +737,7 @@ function ns.UI.CreateTrackerTab(parent)
 
             local descText = OneWoW_GUI:CreateFS(descFrame, 12)
             descText:SetPoint("TOPLEFT", descFrame, "TOPLEFT", 10, -4)
-            descText:SetPoint("RIGHT", descFrame, "RIGHT", -10, 0)
+            descText:SetWidth(math.max(50, DetailContentWidth() - 28))
             descText:SetJustifyH("LEFT")
             descText:SetWordWrap(true)
             descText:SetText(list.description)
@@ -851,7 +879,7 @@ function ns.UI.CreateTrackerTab(parent)
                 tinsert(detailRows, stepRow)
 
                 if isComplete then
-                    stepRow:SetBackdropColor(OneWoW_GUI:GetThemeColor("ACCENT_MUTED"))
+                    stepRow:SetBackdropColor(OneWoW_GUI:GetThemeColor("BG_ACTIVE"))
                     stepRow:SetBackdropBorderColor(OneWoW_GUI:GetThemeColor("BORDER_ACCENT"))
                 elseif not depsMet then
                     stepRow:SetBackdropColor(OneWoW_GUI:GetThemeColor("BG_TERTIARY"))
@@ -904,6 +932,7 @@ function ns.UI.CreateTrackerTab(parent)
                 stepLabel:SetPoint("LEFT", checkBtn, "RIGHT", 6, 0)
                 stepLabel:SetPoint("RIGHT", stepRow, "RIGHT", -100, 0)
                 stepLabel:SetJustifyH("LEFT")
+                stepLabel:SetWordWrap(false)
                 stepLabel:SetText(step.label or "Step")
 
                 if step.optional then
@@ -929,7 +958,7 @@ function ns.UI.CreateTrackerTab(parent)
                 if step.description and step.description ~= "" then
                     local descFS = OneWoW_GUI:CreateFS(stepRow, 10)
                     descFS:SetPoint("TOPLEFT", stepLabel, "BOTTOMLEFT", 0, -2)
-                    descFS:SetPoint("RIGHT", stepRow, "RIGHT", -80, 0)
+                    descFS:SetWidth(math.max(50, DetailContentWidth() - 128))
                     descFS:SetJustifyH("LEFT")
                     descFS:SetWordWrap(true)
                     descFS:SetText(step.description)
@@ -961,7 +990,7 @@ function ns.UI.CreateTrackerTab(parent)
 
                         local objLabel = OneWoW_GUI:CreateFS(stepRow, 10)
                         objLabel:SetPoint("LEFT", objCheck, "RIGHT", 4, 0)
-                        objLabel:SetPoint("RIGHT", stepRow, "RIGHT", -80, 0)
+                        objLabel:SetWidth(math.max(50, DetailContentWidth() - 148))
                         objLabel:SetJustifyH("LEFT")
                         objLabel:SetWordWrap(true)
                         objLabel:SetText(format("[%s] %s", TE:GetTrackTypeDisplayName(obj.type), obj.description or ""))
@@ -1124,7 +1153,25 @@ function ns.UI.CreateTrackerTab(parent)
         end
 
         detailScrollChild:SetHeight(math.max(1, math.abs(yOffset) + 20))
+        lastDetailLayoutW = detailScrollFrame:GetWidth() or lastDetailLayoutW
+        layingOutDetail = false
     end
+
+    detailScrollFrame:HookScript("OnSizeChanged", function(myself, w)
+        w = tonumber(w) or myself:GetWidth() or 0
+        if layingOutDetail or pendingDetailLayout then return end
+        if math.abs(w - lastDetailLayoutW) < 1 then return end
+        pendingDetailLayout = true
+        C_Timer.After(0, function()
+            pendingDetailLayout = false
+            if layingOutDetail then return end
+            local nw = detailScrollFrame:GetWidth() or 0
+            if math.abs(nw - lastDetailLayoutW) < 1 then return end
+            if selectedListID then
+                parent.ShowDetail(selectedListID)
+            end
+        end)
+    end)
 
     newBtn:SetScript("OnClick", function()
         ns.TrackerEditor:ShowNewListDialog(function(newList)
