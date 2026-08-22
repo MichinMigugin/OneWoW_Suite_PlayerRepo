@@ -2,6 +2,7 @@ local _, ns = ...
 local L = ns.L
 
 local OneWoW_GUI = OneWoW_GUI
+local Location = OneWoW.Location
 
 ns.UI = ns.UI or {}
 
@@ -9,6 +10,10 @@ local BACKDROP_INNER_NO_INSETS = OneWoW_GUI.Constants.BACKDROP_INNER_NO_INSETS
 local BACKDROP_SIMPLE = OneWoW_GUI.Constants.BACKDROP_SIMPLE
 
 local ipairs, format, tinsert, wipe = ipairs, format, tinsert, wipe
+
+-- Tracker steps store coordinates as 0-100, so the waypoint call declares that
+-- rather than letting Location guess from the magnitude.
+local PERCENT_COORDS = { format = "percent" }
 
 local LIST_TYPE_ICONS = {
     guide     = "Interface\\Icons\\INV_Misc_Book_09",
@@ -1079,10 +1084,14 @@ function ns.UI.CreateTrackerTab(parent)
                     checkBtn:SetChecked(isComplete)
 
                     if step.rosterMode then
-                        checkBtn:SetScript("OnClick", function()
+                        checkBtn:SetScript("OnClick", function(myself)
                             if TD:IsRosterCompleter(list.id, step.key, TD:GetCurrentCharKey()) then
                                 TD:RemoveRosterCompleter(list.id, step.key, TD:GetCurrentCharKey())
                             else
+                                if not TE:TryUserComplete(list.id, sec.key, step.key) then
+                                    myself:SetChecked(false)
+                                    return
+                                end
                                 TD:RecordRosterCompletion(list.id, step.key)
                             end
                             parent.RefreshList()
@@ -1090,7 +1099,11 @@ function ns.UI.CreateTrackerTab(parent)
                             TE:RefreshAllPinnedWindows()
                         end)
                     elseif step.trackType == "manual" and (not step.objectives or #step.objectives == 0) then
-                        checkBtn:SetScript("OnClick", function()
+                        checkBtn:SetScript("OnClick", function(myself)
+                            if not isComplete and not TE:TryUserComplete(list.id, sec.key, step.key) then
+                                myself:SetChecked(false)
+                                return
+                            end
                             TD:ToggleStepComplete(list.id, sec.key, step.key)
                             parent.RefreshList()
                             parent.RefreshDetailProgress()
@@ -1155,6 +1168,7 @@ function ns.UI.CreateTrackerTab(parent)
                             objCheck:SetScript("OnClick", function()
                                 local nowComplete = TD:GetObjectiveProgress(list.id, sec.key, step.key, obj.key)
                                 TD:SetObjectiveComplete(list.id, sec.key, step.key, obj.key, not nowComplete)
+                                TE:EvaluateStep(list.id, sec.key, step)
                                 parent.RefreshList()
                                 parent.RefreshDetailProgress()
                                 TE:RefreshAllPinnedWindows()
@@ -1240,14 +1254,15 @@ function ns.UI.CreateTrackerTab(parent)
                     if button == "LeftButton" then
                         local hasCoords = step.mapID and step.coordX and step.coordY and tonumber(step.mapID) and tonumber(step.coordX) and tonumber(step.coordY)
                         if hasCoords then
-                            local mid = tonumber(step.mapID)
-                            local cx = tonumber(step.coordX) / 100
-                            local cy = tonumber(step.coordY) / 100
-                            local mapPoint = UiMapPoint.CreateFromCoordinates(mid, cx, cy)
-                            C_Map.SetUserWaypoint(mapPoint)
-                            C_SuperTrack.SetSuperTrackedUserWaypoint(true)
-                            print(format("%s %s", L["ADDON_CHAT_PREFIX"], format(L["TRACKER_WAYPOINT_SET"], step.label or L["TRACKER_STEP_FALLBACK"], tonumber(step.coordX), tonumber(step.coordY))))
+                            if Location.SetWaypoint(step.mapID, step.coordX, step.coordY, PERCENT_COORDS) then
+                                print(format("%s %s", L["ADDON_CHAT_PREFIX"], format(L["TRACKER_WAYPOINT_SET"], step.label or L["TRACKER_STEP_FALLBACK"], tonumber(step.coordX), tonumber(step.coordY))))
+                            else
+                                print(format("%s %s", L["ADDON_CHAT_PREFIX"], L["MSG_CANNOT_SET_WAYPOINT"]))
+                            end
                         elseif not step.optional and step.trackType == "manual" and (not step.objectives or #step.objectives == 0) then
+                            if not isComplete and not TE:TryUserComplete(list.id, sec.key, step.key) then
+                                return
+                            end
                             TD:ToggleStepComplete(list.id, sec.key, step.key)
                             parent.RefreshList()
                             parent.RefreshDetailProgress()
@@ -1267,6 +1282,9 @@ function ns.UI.CreateTrackerTab(parent)
                             if not step.optional and step.trackType == "manual" and (not step.objectives or #step.objectives == 0) then
                                 rootDescription:CreateDivider()
                                 rootDescription:CreateButton(stepRow._trackerComplete and (L["TRACKER_MARK_INCOMPLETE"]) or (L["TRACKER_MARK_COMPLETE"]), function()
+                                    if not stepRow._trackerComplete and not TE:TryUserComplete(list.id, sec.key, step.key) then
+                                        return
+                                    end
                                     TD:ToggleStepComplete(list.id, sec.key, step.key)
                                     parent.RefreshList()
                                     parent.RefreshDetailProgress()
