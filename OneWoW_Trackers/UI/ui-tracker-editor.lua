@@ -9,12 +9,15 @@ local TP = ns.TrackerPresets
 ns.TrackerEditor = {}
 local TE_UI = ns.TrackerEditor
 
-local tinsert, tonumber, tostring = tinsert, tonumber, tostring
+local tinsert, tremove, tonumber, tostring = tinsert, tremove, tonumber, tostring
 local strtrim, sort, pairs, ipairs = strtrim, sort, pairs, ipairs
 local floor = math.floor
+local CreateVector2D = CreateVector2D
+local C_MapExplorationInfo = C_MapExplorationInfo
 
 local BACKDROP_SOFT = OneWoW_GUI.Constants.BACKDROP_SOFT or OneWoW_GUI.Constants.BACKDROP_INNER_NO_INSETS
 local BACKDROP_SIMPLE = OneWoW_GUI.Constants.BACKDROP_SIMPLE
+local MEDIA = OneWoW_GUI.Constants.MEDIA_BASE
 
 local DEFAULT_REPEAT_HOURS = 24
 local LIST_FORM_HEIGHT = 376
@@ -59,6 +62,21 @@ local function FillCoordsFromPosition(card)
     if card._field_mapID then card._field_mapID:SetText(tostring(mapID)) end
     if card._field_x then card._field_x:SetText(format("%.1f", x)) end
     if card._field_y then card._field_y:SetText(format("%.1f", y)) end
+end
+
+local function FillMapFromPosition(card)
+    local mapID = Location.GetPlayerMapID()
+    if not mapID then FillMsg("TRACKER_FILL_NO_POSITION"); return end
+    if card._field_mapID then card._field_mapID:SetText(tostring(mapID)) end
+end
+
+local function FillAreaFromPosition(card)
+    local mapID, x, y = Location.GetPlayerLocation()
+    if not mapID or not x then FillMsg("TRACKER_FILL_NO_POSITION"); return end
+    local ids = C_MapExplorationInfo.GetExploredAreaIDsAtPosition(
+        mapID, CreateVector2D(x / 100, y / 100))
+    if not ids or not ids[1] then FillMsg("TRACKER_FILL_NO_AREA"); return end
+    if card._field_areaID then card._field_areaID:SetText(tostring(ids[1])) end
 end
 
 local function FillInstanceFromCurrent(card)
@@ -116,7 +134,7 @@ local function CreateDialog(config)
     return frame
 end
 
-local function CreateDropdown(parent, width, height)
+local function CreateDropdown(parent, width, height, searchable)
     local dropdown, textFS = OneWoW_GUI:CreateDropdown(parent, {
         width = width or 150,
         height = height or 26,
@@ -145,7 +163,7 @@ local function CreateDropdown(parent, width, height)
     end
 
     OneWoW_GUI:AttachFilterMenu(dropdown, {
-        searchable = false,
+        searchable = searchable == true,
         buildItems = function()
             local items = {}
             for _, opt in ipairs(dropdown._options) do
@@ -624,6 +642,33 @@ local function AttachCardExtra(card, cat, fieldRow, layout, existing, isNew)
             end
             taskDD:SetSelected(currentTask)
         end
+        return
+    end
+
+    if cat.extra == "timer" then
+        local hoursBox = OneWoW_GUI:CreateEditBox(fieldRow, {
+            width = 80,
+            height = 22,
+            maxLetters = 4,
+            showClear = false,
+        })
+        hoursBox:SetNumeric(true)
+        local hours = 1
+        if existing and existing.trackParams and CategoryMatches(cat, existing.trackType) then
+            local n = tonumber(existing.trackParams.interval)
+            if n and n > 0 then
+                hours = floor(n / 3600 + 0.5)
+                if hours < 1 then hours = 1 end
+            end
+        end
+        hoursBox:SetText(tostring(hours))
+        card._hoursBox = hoursBox
+        PlaceFieldSlot(layout, fieldRow, {
+            key = "intervalHours",
+            labelKey = "TRACKER_REPEAT_HOURS",
+            hintKey = "TRACKER_REPEAT_HINT",
+            width = 140,
+        }, hoursBox)
     end
 end
 
@@ -665,6 +710,270 @@ end
 
 local function ReadVaultCard(card)
     return card._vaultDD and card._vaultDD:GetValue() or "vault_raid", {}
+end
+
+local function ReadTimerCard(card)
+    local hours = tonumber(card._hoursBox and card._hoursBox:GetText())
+    if not hours or hours <= 0 then
+        hours = 1
+    end
+    return "custom_timer", { interval = hours * 3600 }
+end
+
+local OBJ_HOST_EMPTY_H = 8
+local OBJ_HOST_MAX_H = 180
+local OBJ_ROW_GAP = 4
+
+local function ObjectiveTypeOptions()
+    local TE = ns.TrackerEngine
+    local opts = {}
+    for _, trackType in ipairs(ns.TrackerData:GetTrackTypes()) do
+        tinsert(opts, { text = TE:GetTrackTypeDisplayName(trackType), value = trackType })
+    end
+    return opts
+end
+
+local function ReadObjectiveRow(row)
+    local objType = row._typeDD:GetValue() or "manual"
+    local params = {}
+    for _, field in ipairs(row._fields or {}) do
+        local val = ReadFieldWidget(row["_field_" .. field.key], field)
+        if val ~= nil then
+            params[field.key] = val
+        elseif field.default ~= nil then
+            params[field.key] = field.default
+        end
+    end
+    local desc = strtrim(row._descBox:GetSearchText() or "")
+    return objType, params, desc
+end
+
+local function SizeObjectiveRow(row)
+    local h = 30
+    row._descBox:ClearAllPoints()
+    if row._paramHost and row._fields and #row._fields > 0 then
+        h = h + (row._paramHost:GetHeight() or 0) + 4
+        row._descBox:SetPoint("TOPLEFT", row._paramHost, "BOTTOMLEFT", 0, -4)
+    else
+        row._descBox:SetPoint("TOPLEFT", row._typeDD, "BOTTOMLEFT", 0, -4)
+    end
+    row._descBox:SetPoint("RIGHT", row, "RIGHT", -8, 0)
+    h = h + 26
+    row:SetHeight(h)
+end
+
+local function SyncObjHostHeight(dialog)
+    local contentH = dialog._objScrollChild:GetHeight() or 0
+    local h = OBJ_HOST_EMPTY_H
+    if #(dialog._objRows or {}) > 0 then
+        h = math.min(OBJ_HOST_MAX_H, math.max(40, contentH))
+    end
+    dialog._objHost:SetHeight(h)
+end
+
+local function ReflowObjectiveRows(dialog)
+    local y = 0
+    for _, row in ipairs(dialog._objRows) do
+        row:ClearAllPoints()
+        row:SetPoint("TOPLEFT", dialog._objScrollChild, "TOPLEFT", 0, y)
+        row:SetPoint("TOPRIGHT", dialog._objScrollChild, "TOPRIGHT", 0, y)
+        y = y - row:GetHeight() - OBJ_ROW_GAP
+    end
+    dialog._objScrollChild:SetHeight(math.max(1, math.abs(y)))
+    SyncObjHostHeight(dialog)
+end
+
+local function RebuildObjectiveParams(row, trackType, params)
+    if row._fields then
+        for _, field in ipairs(row._fields) do
+            row["_field_" .. field.key] = nil
+        end
+    end
+    if row._paramHost then
+        row._paramHost:Hide()
+        row._paramHost:SetParent(nil)
+        row._paramHost = nil
+    end
+
+    local fields = Schema.GetFields(trackType)
+    row._fields = fields
+    local host = OneWoW_GUI:CreateLayoutFrame(row, {})
+    host:SetPoint("TOPLEFT", row._typeDD, "BOTTOMLEFT", 0, -4)
+    host:SetPoint("RIGHT", row, "RIGHT", -8, 0)
+    row._paramHost = host
+
+    if #fields == 0 then
+        host:SetHeight(1)
+        host:Hide()
+        SizeObjectiveRow(row)
+        return
+    end
+
+    local layout = { fx = 0, fy = 0, rowH = FIELD_ROW_H }
+    for _, field in ipairs(fields) do
+        local existingVal = params and params[field.key]
+        local widget = CreateFieldWidget(host, field, existingVal, existingVal == nil)
+        row["_field_" .. field.key] = widget
+        PlaceFieldSlot(layout, host, field, widget)
+    end
+    host:SetHeight(FieldLayoutHeight(layout))
+    host:Show()
+    SizeObjectiveRow(row)
+end
+
+local function AddObjectiveRow(dialog, obj)
+    local row = OneWoW_GUI:CreateFrame(dialog._objScrollChild, { backdrop = BACKDROP_SOFT })
+    row._objKey = obj and obj.key or nil
+
+    local typeDD = CreateDropdown(row, 220, 22, true)
+    typeDD:SetPoint("TOPLEFT", row, "TOPLEFT", 6, -6)
+    typeDD:SetOptions(dialog._objTypeOpts)
+    local objType = (obj and obj.type) or "manual"
+    typeDD:SetSelected(objType)
+    row._typeDD = typeDD
+
+    local removeBtn = OneWoW_GUI:CreateIconButton(row, {
+        iconTexture = MEDIA .. "icon-trash.png",
+        size = 18,
+        tooltipTitle = DELETE,
+        onClick = function()
+            for i, r in ipairs(dialog._objRows) do
+                if r == row then
+                    tremove(dialog._objRows, i)
+                    break
+                end
+            end
+            row:Hide()
+            row:SetParent(nil)
+            ReflowObjectiveRows(dialog)
+        end,
+    })
+    removeBtn:SetPoint("TOPRIGHT", row, "TOPRIGHT", -6, -6)
+
+    local descBox = OneWoW_GUI:CreateEditBox(row, {
+        width = 1,
+        height = 22,
+        placeholderText = L["TRACKER_FH_OBJECTIVE_DESC"],
+        maxLetters = 200,
+        showClear = false,
+    })
+    row._descBox = descBox
+    if obj and obj.description and obj.description ~= "" then
+        descBox:SetText(obj.description)
+    end
+
+    typeDD.onSelect = function(value)
+        RebuildObjectiveParams(row, value, nil)
+        ReflowObjectiveRows(dialog)
+    end
+
+    RebuildObjectiveParams(row, objType, obj and obj.params)
+    tinsert(dialog._objRows, row)
+    ReflowObjectiveRows(dialog)
+    return row
+end
+
+--- Draft rows live on the dialog; UpdateStep skips objectives, so save
+--- flushes through AddObjective / UpdateObjective / RemoveObjective.
+local function FlushObjectives(dialog, listID, sectionKey, stepKey)
+    local TD = ns.TrackerData
+    local keep = {}
+    for _, row in ipairs(dialog._objRows or {}) do
+        local objType, params, desc = ReadObjectiveRow(row)
+        local isBlankNew = not row._objKey
+            and objType == "manual"
+            and desc == ""
+            and (not row._fields or #row._fields == 0)
+        if not isBlankNew then
+            if row._objKey then
+                TD:UpdateObjective(listID, sectionKey, stepKey, row._objKey, {
+                    type = objType,
+                    params = params,
+                    description = desc,
+                })
+                keep[row._objKey] = true
+            else
+                local added = TD:AddObjective(listID, sectionKey, stepKey, {
+                    type = objType,
+                    params = params,
+                    description = desc,
+                })
+                if added then keep[added.key] = true end
+            end
+        end
+    end
+    local step = TD:GetStep(listID, sectionKey, stepKey)
+    if not step then return end
+    local stale = {}
+    for _, obj in ipairs(step.objectives or {}) do
+        if not keep[obj.key] then
+            tinsert(stale, obj.key)
+        end
+    end
+    for _, objKey in ipairs(stale) do
+        TD:RemoveObjective(listID, sectionKey, stepKey, objKey)
+    end
+end
+
+local function CommitStep(dialog, listID, sectionKey, stepKey, isEdit, changes, callback)
+    local TD = ns.TrackerData
+    local step
+    if isEdit then
+        TD:UpdateStep(listID, sectionKey, stepKey, changes)
+        step = TD:GetStep(listID, sectionKey, stepKey)
+    else
+        step = TD:AddStep(listID, sectionKey, changes)
+    end
+    if step then
+        FlushObjectives(dialog, listID, sectionKey, step.key)
+    end
+    dialog:Hide(); dialog:SetParent(nil)
+    if callback then callback() end
+end
+
+local function WireObjectivesEditor(dialog, content, anchor, existing)
+    local header = OneWoW_GUI:CreateFS(content, 12)
+    header:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -10)
+    header:SetText(OBJECTIVES_LABEL)
+    header:SetTextColor(OneWoW_GUI:GetThemeColor("TEXT_ACCENT"))
+
+    local addBtn = OneWoW_GUI:CreateFitTextButton(content, { text = ADD, height = 22 })
+    addBtn:SetPoint("RIGHT", content, "RIGHT", -10, 0)
+    addBtn:SetPoint("TOP", header, "TOP", 0, 2)
+
+    local hint = OneWoW_GUI:CreateFS(content, 10)
+    hint:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 0, -2)
+    hint:SetPoint("RIGHT", addBtn, "LEFT", -8, 0)
+    hint:SetJustifyH("LEFT")
+    hint:SetWordWrap(true)
+    hint:SetText(L["TRACKER_OBJECTIVES_HINT"])
+    hint:SetTextColor(OneWoW_GUI:GetThemeColor("TEXT_MUTED"))
+
+    local host = OneWoW_GUI:CreateFrame(content, { backdrop = BACKDROP_SIMPLE })
+    host:ClearAllPoints()
+    host:SetPoint("TOPLEFT", hint, "BOTTOMLEFT", 0, -4)
+    host:SetPoint("RIGHT", content, "RIGHT", -10, 0)
+    host:SetHeight(OBJ_HOST_EMPTY_H)
+    dialog._objHost = host
+
+    local scrollFrame, scrollChild = OneWoW_GUI:CreateScrollFrame(host, {})
+    scrollFrame:SetPoint("TOPLEFT", host, "TOPLEFT", 0, 0)
+    scrollFrame:SetPoint("BOTTOMRIGHT", host, "BOTTOMRIGHT", 0, 0)
+    dialog._objScrollChild = scrollChild
+    dialog._objRows = {}
+    dialog._objTypeOpts = ObjectiveTypeOptions()
+
+    addBtn:SetScript("OnClick", function()
+        AddObjectiveRow(dialog, nil)
+    end)
+
+    if existing and existing.objectives then
+        for _, obj in ipairs(existing.objectives) do
+            AddObjectiveRow(dialog, obj)
+        end
+    end
+
+    return host
 end
 
 --- Explicit max box wins; otherwise derive from type params (item count, pool pick, ...).
@@ -902,6 +1211,13 @@ local STEP_CATEGORIES = {
     },
     { key = "quest_pool",          titleKey = "TRACKER_SC_QUEST_POOL_TITLE",          descKey = "TRACKER_SC_QUEST_POOL_DESC",          trackType = "quest_pool" },
     { key = "quest_pool_account",  titleKey = "TRACKER_SC_QUEST_POOL_ACCOUNT_TITLE",  descKey = "TRACKER_SC_QUEST_POOL_ACCOUNT_DESC",  trackType = "quest_pool_account" },
+    { key = "quest_progress",      titleKey = "TRACKER_TYPE_QUEST_PROGRESS",          descKey = "TRACKER_SC_QUEST_PROGRESS_DESC",      trackType = "quest_progress" },
+    {
+        key = "campaign",
+        titleText = L["CAMPAIGN"],
+        descKey = "TRACKER_SC_CAMPAIGN_DESC",
+        trackType = "campaign",
+    },
     { key = "item",                titleKey = "TRACKER_SC_ITEM_TITLE",                descKey = "TRACKER_SC_ITEM_DESC",                trackType = "item" },
     { key = "currency",            titleKey = "TRACKER_SC_CURRENCY_TITLE",            descKey = "TRACKER_SC_CURRENCY_DESC",            trackType = "currency" },
     { key = "achievement",         titleKey = "TRACKER_SC_ACHIEVEMENT_TITLE",         descKey = "TRACKER_SC_ACHIEVEMENT_DESC",         trackType = "achievement" },
@@ -920,6 +1236,22 @@ local STEP_CATEGORIES = {
         trackType = "coordinates",
         fillKey = "TRACKER_FILL_FROM_POSITION",
         onFill = function(card) FillCoordsFromPosition(card) end,
+    },
+    {
+        key = "location",
+        titleKey = "TRACKER_SC_ZONE_TITLE",
+        descKey = "TRACKER_SC_ZONE_DESC",
+        trackType = "location",
+        fillKey = "TRACKER_FILL_FROM_POSITION",
+        onFill = function(card) FillMapFromPosition(card) end,
+    },
+    {
+        key = "exploration",
+        titleKey = "TRACKER_TYPE_EXPLORATION",
+        descKey = "TRACKER_SC_EXPLORATION_DESC",
+        trackType = "exploration",
+        fillKey = "TRACKER_FILL_FROM_POSITION",
+        onFill = function(card) FillAreaFromPosition(card) end,
     },
     {
         key = "npc",
@@ -945,6 +1277,7 @@ local STEP_CATEGORIES = {
         fillKey = "TRACKER_FILL_FROM_TARGET",
         onFill = function(card) FillCreatureFromTarget(card, "creatureID") end,
     },
+    { key = "loot_item",   titleKey = "TRACKER_TYPE_LOOT_ITEM",    descKey = "TRACKER_SC_LOOT_DESC",     trackType = "loot_item" },
     { key = "mount",       titleKey = "TRACKER_SC_MOUNT_TITLE",    descKey = "TRACKER_SC_MOUNT_DESC",    trackType = "mount" },
     { key = "pet",         titleKey = "TRACKER_SC_PET_TITLE",      descKey = "TRACKER_SC_PET_DESC",      trackType = "pet" },
     { key = "toy",         titleKey = "TRACKER_SC_TOY_TITLE",      descKey = "TRACKER_SC_TOY_DESC",      trackType = "toy" },
@@ -961,6 +1294,13 @@ local STEP_CATEGORIES = {
         trackType = "prof_skill",
         extra = "profession",
         matchesTypes = { "prof_skill", "prof_concentration", "prof_knowledge", "prof_firstcraft", "prof_catchup" },
+    },
+    {
+        key = "custom_timer",
+        titleKey = "TRACKER_TYPE_CUSTOM_TIMER",
+        descKey = "TRACKER_SC_TIMER_DESC",
+        trackType = "custom_timer",
+        extra = "timer",
     },
 }
 
@@ -1476,13 +1816,7 @@ function TE_UI:ShowStepEditor(listID, sectionKey, stepKey, callback)
                         changes.trackParams = {}
                     end
                     ApplySharedStepFields(frame, changes)
-                    if isEdit then
-                        TD:UpdateStep(listID, sectionKey, stepKey, changes)
-                    else
-                        TD:AddStep(listID, sectionKey, changes)
-                    end
-                    frame:Hide(); frame:SetParent(nil)
-                    if callback then callback() end
+                    CommitStep(frame, listID, sectionKey, stepKey, isEdit, changes, callback)
                 end,
             },
             { text = CANCEL, onClick = function(frame) frame:Hide(); frame:SetParent(nil) end },
@@ -1669,8 +2003,10 @@ function TE_UI:ShowStepEditor(listID, sectionKey, stepKey, callback)
     wpFill:SetPoint("LEFT", wpRadius, "RIGHT", 8, 0)
     wpFill:SetScript("OnClick", function() FillSharedWaypoint(dialog) end)
 
+    local objHost = WireObjectivesEditor(dialog, content, wpMap, existing)
+
     local typeHeader = OneWoW_GUI:CreateFS(content, 12)
-    typeHeader:SetPoint("TOPLEFT", wpMap, "BOTTOMLEFT", 0, -10)
+    typeHeader:SetPoint("TOPLEFT", objHost, "BOTTOMLEFT", 0, -10)
     typeHeader:SetText(L["TRACKER_STEP_TRACK_HEADER"])
     typeHeader:SetTextColor(OneWoW_GUI:GetThemeColor("TEXT_ACCENT"))
 
@@ -1773,15 +2109,17 @@ function TE_UI:ShowStepEditor(listID, sectionKey, stepKey, callback)
 
             local layout = { fx = 0, fy = 0, rowH = FIELD_ROW_H }
             local isNew = not existing
-            for _, field in ipairs(fields) do
-                local existingVal
-                if existing and existing.trackParams and CategoryMatches(cat, existing.trackType) then
-                    existingVal = existing.trackParams[field.key]
+            if cat.extra ~= "timer" then
+                for _, field in ipairs(fields) do
+                    local existingVal
+                    if existing and existing.trackParams and CategoryMatches(cat, existing.trackType) then
+                        existingVal = existing.trackParams[field.key]
+                    end
+                    local widget = CreateFieldWidget(fieldRow, field, existingVal, isNew)
+                    widget._fieldKey = field.key
+                    card["_field_" .. field.key] = widget
+                    PlaceFieldSlot(layout, fieldRow, field, widget)
                 end
-                local widget = CreateFieldWidget(fieldRow, field, existingVal, isNew)
-                widget._fieldKey = field.key
-                card["_field_" .. field.key] = widget
-                PlaceFieldSlot(layout, fieldRow, field, widget)
             end
             AttachCardExtra(card, cat, fieldRow, layout, existing, isNew)
             fieldRow:SetHeight(FieldLayoutHeight(layout))
@@ -1838,6 +2176,8 @@ function TE_UI:ShowStepEditor(listID, sectionKey, stepKey, callback)
                 elseif cat.extra == "quest" then
                     trackType, trackParams = ReadQuestCard(card)
                     if not trackParams then return end
+                elseif cat.extra == "timer" then
+                    trackType, trackParams = ReadTimerCard(card)
                 else
                     local hasRequired = true
                     for _, field in ipairs(fields) do
@@ -1866,14 +2206,7 @@ function TE_UI:ShowStepEditor(listID, sectionKey, stepKey, callback)
                     changes.waypointRadius = trackParams.radius or 15
                 end
 
-                if isEdit then
-                    TD:UpdateStep(listID, sectionKey, stepKey, changes)
-                else
-                    TD:AddStep(listID, sectionKey, changes)
-                end
-
-                dialog:Hide(); dialog:SetParent(nil)
-                if callback then callback() end
+                CommitStep(dialog, listID, sectionKey, stepKey, isEdit, changes, callback)
             end
 
             saveFieldBtn:SetScript("OnClick", card._doSave)
@@ -1894,14 +2227,7 @@ function TE_UI:ShowStepEditor(listID, sectionKey, stepKey, callback)
                 }
                 ApplySharedStepFields(dialog, changes)
 
-                if isEdit then
-                    TD:UpdateStep(listID, sectionKey, stepKey, changes)
-                else
-                    TD:AddStep(listID, sectionKey, changes)
-                end
-
-                dialog:Hide(); dialog:SetParent(nil)
-                if callback then callback() end
+                CommitStep(dialog, listID, sectionKey, stepKey, isEdit, changes, callback)
                 return
             end
 
